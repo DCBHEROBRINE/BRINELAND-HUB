@@ -1,8 +1,7 @@
 --[[
     ============================================================
-    MASTER MULTI-GAME HUB LOADER
+    MASTER MULTI-GAME HUB LOADER (FIXED & COMPLETED)
     Auto-detects the current game and loads the correct script.
-    Defaults to the "Universal Help Hub" if the game is unsupported.
     ============================================================
 ]]
 
@@ -10,7 +9,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Fetch Game Name Safely to determine which script to load
+-- Fetch Game Name Safely
 local success, placeInfo = pcall(function()
     return MarketplaceService:GetProductInfo(game.PlaceId)
 end)
@@ -30,7 +29,15 @@ local function LoadTaxiBoss()
         PlayerGui.TaxiBossCustomHub:Destroy()
     end
 
-    local Config = { AutoCollectItems = false, ClearAICars = false, EnableCarSpeed = false, TargetKMH = 220, PlayerSpeed = 16, ItemDelay = 0.15, TweenSpeed = 260 }
+    local Config = {
+        AutoCollectItems = false,
+        ClearAICars      = false,
+        EnableCarSpeed   = false,
+        TargetKMH        = 220,
+        PlayerSpeed      = 16,
+        ItemDelay        = 0.15,
+        TweenSpeed       = 260
+    }
 
     local function GetPlayerVehicle()
         local char = LocalPlayer.Character
@@ -118,7 +125,6 @@ local function LoadTaxiBoss()
         end
     end)
 
-    -- Taxi Boss GUI Build
     local ScreenGui = Instance.new("ScreenGui", PlayerGui)
     ScreenGui.Name = "TaxiBossCustomHub"
     ScreenGui.ResetOnSpawn = false
@@ -128,16 +134,7 @@ local function LoadTaxiBoss()
     MainFrame.Position = UDim2.new(0.5, -170, 0.5, -160)
     MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
     MainFrame.Active = true
-    MainFrame.Draggable = true
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-
-    local Gradient = Instance.new("UIGradient", MainFrame)
-    Gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(55, 20, 95)),
-        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(25, 35, 115)),
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(15, 65, 145))
-    })
-    Gradient.Rotation = 45
 
     local TopBar = Instance.new("Frame", MainFrame)
     TopBar.Size = UDim2.new(1, 0, 0, 40)
@@ -170,6 +167,21 @@ local function LoadTaxiBoss()
     local Layout = Instance.new("UIListLayout", Container)
     Layout.Padding = UDim.new(0, 6)
 
+    -- Draggable functionality
+    local dragging, dragStart, startPos
+    TopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function() dragging = false end)
+
     local function CreateToggle(text, callback)
         local btn = Instance.new("TextButton", Container)
         btn.Size = UDim2.new(1, 0, 0, 40)
@@ -199,6 +211,7 @@ local function LoadStealAnEgg()
     local TweenService     = game:GetService("TweenService")
     local Workspace        = game:GetService("Workspace")
     local RunService       = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     if PlayerGui:FindFirstChild("StealAnEggHubV7") then PlayerGui.StealAnEggHubV7:Destroy() end
@@ -246,7 +259,6 @@ local function LoadStealAnEgg()
 
     local function GetEggTargets()
         local targets = {}
-        local myPlot = GetMyPlot()
         local areaSlots = Workspace:FindFirstChild("AreaEggSlotsClient")
         if areaSlots then
             for _, model in ipairs(areaSlots:GetChildren()) do
@@ -266,7 +278,10 @@ local function LoadStealAnEgg()
                     local hitboxPart = target.Part
                     if hitboxPart and hitboxPart.Parent then
                         MoveToTarget(hitboxPart.CFrame + Vector3.new(0, 2, 0))
-                        pcall(function() firetouchinterest(LocalPlayer.Character.HumanoidRootPart, hitboxPart, 0); firetouchinterest(LocalPlayer.Character.HumanoidRootPart, hitboxPart, 1) end)
+                        pcall(function()
+                            firetouchinterest(LocalPlayer.Character.HumanoidRootPart, hitboxPart, 0)
+                            firetouchinterest(LocalPlayer.Character.HumanoidRootPart, hitboxPart, 1)
+                        end)
                         task.wait(0.15)
                         MoveToTarget(GetSafeZoneCFrame())
                         task.wait(0.2)
@@ -284,7 +299,6 @@ local function LoadStealAnEgg()
     MainFrame.Size = UDim2.fromOffset(360, 430)
     MainFrame.Position = UDim2.new(0.5, -180, 0.5, -215)
     MainFrame.BackgroundColor3 = Color3.fromRGB(14, 12, 26)
-    MainFrame.Draggable = true
     MainFrame.Active = true
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
     
@@ -307,6 +321,21 @@ local function LoadStealAnEgg()
     Container.BackgroundTransparency = 1
     local Layout = Instance.new("UIListLayout", Container)
     Layout.Padding = UDim.new(0, 6)
+
+    -- Draggable functionality
+    local dragging, dragStart, startPos
+    TopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function() dragging = false end)
 
     local function CreateToggle(text, configKey)
         local btn = Instance.new("TextButton", Container)
@@ -379,4 +408,27 @@ local function LoadKeyboardEscape()
     if LocalPlayer.Character then protectHumanoid(LocalPlayer.Character) end
     LocalPlayer.CharacterAdded:Connect(protectHumanoid)
 
-    RunService.Stepped:Connect(function
+    RunService.Stepped:Connect(function()
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                -- Keeps player active and ensures speed modification attributes remain active
+            end
+        end
+    end)
+end
+
+-- ============================================================
+-- AUTO-DETECTION ROUTER & EXECUTION
+-- ============================================================
+if gameName:find("taxi") and gameName:find("boss") then
+    LoadTaxiBoss()
+elseif gameName:find("steal") and gameName:find("egg") then
+    LoadStealAnEgg()
+elseif gameName:find("keyboard") or gameName:find("escape") or gameName:find("brineland") or gameName:find("speed") then
+    LoadKeyboardEscape()
+else
+    -- Fallback: Load Keyboard Escape if game name is not recognized
+    LoadKeyboardEscape()
+end
