@@ -1,26 +1,16 @@
---[[
-    ============================================================
-    TAXI BOSS - CUSTOM GROUND-TRUTH MOBILE HUB
-    Targeting updates:
-      - Renamed toggles: "collect part", "clear ai car", "car boost"
-    ============================================================
-]]
-
--- ================= SERVICES =================
-local Players          = game:GetService("Players")
+-- Taxi Boss Ground-Truth Mobile Hub
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace        = game:GetService("Workspace")
 local RunService       = game:GetService("RunService")
+local Players          = game:GetService("Players")
 local LocalPlayer      = Players.LocalPlayer
 
--- ================= CLEANUP PREVIOUS INSTANCES =================
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 if PlayerGui:FindFirstChild("TaxiBossCustomHub") then
     PlayerGui.TaxiBossCustomHub:Destroy()
 end
 
--- ================= CONFIGURATION =================
 local Config = {
     AutoCollectItems = false,
     ClearAICars      = false,
@@ -31,7 +21,6 @@ local Config = {
     TweenSpeed       = 260
 }
 
--- ================= UTILITY & VEHICLE DETECTOR =================
 local function GetPlayerVehicle()
     local char = LocalPlayer.Character
     if not char then return nil end
@@ -42,26 +31,6 @@ local function GetPlayerVehicle()
     return nil
 end
 
-local function GetGroundCFrame(cframe)
-    local rayOrigin = cframe.Position + Vector3.new(0, 30, 0)
-    local rayDirection = Vector3.new(0, -100, 0)
-    
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    
-    local filterList = {LocalPlayer.Character}
-    local veh = GetPlayerVehicle()
-    if veh then table.insert(filterList, veh) end
-    params.FilterDescendantsInstances = filterList
-
-    local result = Workspace:Raycast(rayOrigin, rayDirection, params)
-    if result then
-        return CFrame.new(result.Position + Vector3.new(0, 3.2, 0)) * (cframe - cframe.Position)
-    end
-    return cframe
-end
-
--- ================= ITEM SPAWN FARMING =================
 local function CollectItemSpawns()
     local itemFolder = Workspace:FindFirstChild("ItemSpawnLocations")
     if not itemFolder then return end
@@ -104,39 +73,28 @@ local function CollectItemSpawns()
     end
 end
 
--- ================= BACKGROUND THREADS =================
-
--- 1. Auto Collect Items Loop
 task.spawn(function()
     while task.wait(0.5) do
-        if Config.AutoCollectItems then
-            pcall(CollectItemSpawns)
-        end
+        if Config.AutoCollectItems then pcall(CollectItemSpawns) end
     end
 end)
 
--- 2. AI Traffic Wiping Loop
 task.spawn(function()
     while task.wait(1.5) do
         if Config.ClearAICars then
             local aiFolder = Workspace:FindFirstChild("AICars")
             if aiFolder then
-                for _, car in ipairs(aiFolder:GetChildren()) do
-                    car:Destroy()
-                end
+                for _, car in ipairs(aiFolder:GetChildren()) do car:Destroy() end
             end
         end
     end
 end)
 
--- 3. Vehicle & Character Physics Controller
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum and hum.WalkSpeed ~= Config.PlayerSpeed then
-            hum.WalkSpeed = Config.PlayerSpeed
-        end
+        if hum and hum.WalkSpeed ~= Config.PlayerSpeed then hum.WalkSpeed = Config.PlayerSpeed end
     end
 
     if Config.EnableCarSpeed then
@@ -151,18 +109,14 @@ RunService.Heartbeat:Connect(function()
                 if seat.Throttle > -1 then
                     local root = seat.AssemblyRootPart or seat
                     local lookVector = seat.CFrame.LookVector
-                    root.AssemblyLinearVelocity = Vector3.new(
-                        lookVector.X * speedStuds,
-                        root.AssemblyLinearVelocity.Y,
-                        lookVector.Z * speedStuds
-                    )
+                    root.AssemblyLinearVelocity = Vector3.new(lookVector.X * speedStuds, root.AssemblyLinearVelocity.Y, lookVector.Z * speedStuds)
                 end
             end
         end
     end
 end)
 
--- ================= GUI DESIGN & MOBILE CONTROLS =================
+-- GUI Construction
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TaxiBossCustomHub"
 ScreenGui.ResetOnSpawn = false
@@ -193,7 +147,6 @@ Stroke.Color = Color3.fromRGB(150, 85, 255)
 Stroke.Thickness = 1.5
 Stroke.Parent = MainFrame
 
--- TOP BAR
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 40)
 TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
@@ -213,7 +166,6 @@ Title.RichText = true
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- MINIMIZE BUTTON
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.fromOffset(28, 28)
 MinimizeBtn.Position = UDim2.new(1, -64, 0.5, -14)
@@ -226,7 +178,6 @@ MinimizeBtn.RichText = true
 MinimizeBtn.Parent = TopBar
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
 
--- CLOSE BUTTON
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.fromOffset(28, 28)
 CloseBtn.Position = UDim2.new(1, -32, 0.5, -14)
@@ -237,10 +188,8 @@ CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 13
 CloseBtn.RichText = true
 CloseBtn.Parent = TopBar
-
 CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
--- CONTAINER
 local Container = Instance.new("ScrollingFrame")
 Container.Size = UDim2.new(1, -12, 1, -48)
 Container.Position = UDim2.new(0, 6, 0, 44)
@@ -253,7 +202,6 @@ local Layout = Instance.new("UIListLayout")
 Layout.Padding = UDim.new(0, 6)
 Layout.Parent = Container
 
--- MINIMIZE LOGIC
 local isMinimized = false
 MinimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
@@ -269,7 +217,6 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- DRAGGABLE LOGIC FOR MOBILE
 local dragging, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -282,9 +229,8 @@ UserInputService.InputChanged:Connect(function(input)
         MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
-UserInputService.InputEnded:Connect(function(input) dragging = false end)
+UserInputService.InputEnded:Connect(function() dragging = false end)
 
--- UI CONTROLLERS
 local function CreateToggle(text, callback)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, -4, 0, 40)
@@ -369,23 +315,8 @@ local function CreateInput(text, defaultVal, callback)
     end)
 end
 
--- ================= POPULATE TOGGLES =================
-CreateToggle("collect part", function(state)
-    Config.AutoCollectItems = state
-end)
-
-CreateToggle("clear ai car", function(state)
-    Config.ClearAICars = state
-end)
-
-CreateToggle("car boost", function(state)
-    Config.EnableCarSpeed = state
-end)
-
-CreateInput("Target Speed (KM/H)", Config.TargetKMH, function(val)
-    Config.TargetKMH = val
-end)
-
-CreateInput("Player WalkSpeed", Config.PlayerSpeed, function(val)
-    Config.PlayerSpeed = val
-end)
+CreateToggle("collect part", function(state) Config.AutoCollectItems = state end)
+CreateToggle("clear ai car", function(state) Config.ClearAICars = state end)
+CreateToggle("car boost", function(state) Config.EnableCarSpeed = state end)
+CreateInput("Target Speed (KM/H)", Config.TargetKMH, function(val) Config.TargetKMH = val end)
+CreateInput("Player WalkSpeed", Config.PlayerSpeed, function(val) Config.PlayerSpeed = val end)
