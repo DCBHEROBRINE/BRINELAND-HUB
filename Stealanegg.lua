@@ -1,73 +1,31 @@
---[[
-    ============================================================
-    STEAL AN EGG - REVISED HUB V7
-    - Game Verification Lock (Only runs in "Steal an Egg")
-    - Instant Proximity Prompts (Built-in Always-On Feature)
-    - Re-engineered Auto Place Egg (Equip -> Teleport to Plot -> Place)
-    - Re-engineered Auto Hatch (GUI Buttons & Plot Prompts)
-    - Multi-Click Registration Fix
-    - Plain Text UI (No Bracket/HTML Tags)
-    - Animated Open/Close GUI Toggle
-    ============================================================
-]]
-
--- ================= GAME VERIFICATION LOCK =================
-local MarketplaceService = game:GetService("MarketplaceService")
-local isCorrectGame = false
-
-local success, placeInfo = pcall(function()
-    return MarketplaceService:GetProductInfo(game.PlaceId)
-end)
-
-if success and placeInfo and placeInfo.Name then
-    local nameLower = placeInfo.Name:lower()
-    if nameLower:find("steal") and nameLower:find("egg") then
-        isCorrectGame = true
-    end
-end
-
-if not isCorrectGame then
-    warn("[STEAL AN EGG HUB] Execution stopped: This script only works in 'Steal an Egg'.")
-    return
-end
-
--- ================= SERVICES =================
-local Players          = game:GetService("Players")
+-- Steal An Egg Hub V7
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace        = game:GetService("Workspace")
 local RunService       = game:GetService("RunService")
+local Players          = game:GetService("Players")
 local LocalPlayer      = Players.LocalPlayer
 
--- ================= CLEANUP PREVIOUS INSTANCES =================
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 if PlayerGui:FindFirstChild("StealAnEggHubV7") then
     PlayerGui.StealAnEggHubV7:Destroy()
 end
 
--- ================= CONFIGURATION =================
 local Config = {
     AutoSteal            = false,
-    StealMethod          = "Tween", -- "Tween", "Walk"
+    StealMethod          = "Tween",
     TweenSpeed           = 80,
     StealWalkSpeed       = 28,
-    
     AutoHit              = false,
     HitRange             = 12,
-    
     AutoPlaceEgg         = false,
     AutoHatch            = false,
-    
     AutoUpgradeTreadmill = false,
     AutoUpgradePen       = false,
-    
     EnableSpeed          = false,
     PlayerSpeed          = 24
 }
 
--- ================= HELPER FUNCTIONS =================
-
--- Robust Multi-Click Event Binder
 local function BindClick(button, callback)
     button.Active = true
     local lastClick = 0
@@ -82,7 +40,6 @@ local function BindClick(button, callback)
     button.Activated:Connect(trigger)
 end
 
--- Locate Local Player's Plot Base / Safe Zone
 local function GetMyPlot()
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then return nil end
@@ -92,7 +49,6 @@ local function GetMyPlot()
         if owner and (owner.Value == LocalPlayer or owner.Value == LocalPlayer.Name) then
             return plot
         end
-        
         for _, desc in ipairs(plot:GetDescendants()) do
             if desc:IsA("TextLabel") and (desc.Text:find(LocalPlayer.Name) or desc.Text:find(LocalPlayer.DisplayName)) then
                 return plot
@@ -117,7 +73,6 @@ local function GetSafeZoneCFrame()
     return char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame or CFrame.new(0, 10, 0)
 end
 
--- Touch Part Simulation
 local function TouchPart(part)
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -132,7 +87,6 @@ local function TouchPart(part)
     end
 end
 
--- Click UI Button Simulation
 local function ClickButton(button)
     pcall(function()
         if firesignal then
@@ -145,7 +99,6 @@ local function ClickButton(button)
     end)
 end
 
--- ================= MOVEMENT ENGINE =================
 local function MoveToTarget(targetCFrame)
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -161,7 +114,6 @@ local function MoveToTarget(targetCFrame)
         local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
         tween:Play()
         tween.Completed:Wait()
-
     elseif Config.StealMethod == "Walk" then
         if hum then
             local prevSpeed = hum.WalkSpeed
@@ -172,42 +124,31 @@ local function MoveToTarget(targetCFrame)
                 task.wait(0.1)
                 timeout = timeout + 0.1
             until (hrp.Position - targetCFrame.Position).Magnitude <= 4 or timeout >= (distance / math.max(5, Config.StealWalkSpeed))
-            
-            if not Config.EnableSpeed then
-                hum.WalkSpeed = prevSpeed
-            end
+            if not Config.EnableSpeed then hum.WalkSpeed = prevSpeed end
         end
     end
 end
 
--- ================= SCAN ALL EGGS =================
 local function GetEggTargets()
     local targets = {}
     local myPlot = GetMyPlot()
 
-    -- 1. AreaEggSlotsClient
     local areaSlots = Workspace:FindFirstChild("AreaEggSlotsClient")
     if areaSlots then
         for _, model in ipairs(areaSlots:GetChildren()) do
             local hitbox = model:FindFirstChild("Hitbox") or model:FindFirstChildWhichIsA("BasePart", true)
-            if hitbox then
-                table.insert(targets, {Part = hitbox, Model = model})
-            end
+            if hitbox then table.insert(targets, {Part = hitbox, Model = model}) end
         end
     end
 
-    -- 2. SammyEventMap
     local sammyMap = Workspace:FindFirstChild("SammyEventMap")
     if sammyMap then
         for _, model in ipairs(sammyMap:GetChildren()) do
             local hitbox = model:FindFirstChild("Hitbox", true) or model:FindFirstChildWhichIsA("BasePart", true)
-            if hitbox then
-                table.insert(targets, {Part = hitbox, Model = model})
-            end
+            if hitbox then table.insert(targets, {Part = hitbox, Model = model}) end
         end
     end
 
-    -- 3. Enemy Plots
     local plots = Workspace:FindFirstChild("Plots")
     if plots then
         for _, plot in ipairs(plots:GetChildren()) do
@@ -215,64 +156,44 @@ local function GetEggTargets()
                 for _, obj in ipairs(plot:GetDescendants()) do
                     if obj:IsA("Model") and obj.Name:lower():find("egg") then
                         local hitbox = obj:FindFirstChild("Hitbox") or obj:FindFirstChildWhichIsA("BasePart", true)
-                        if hitbox then
-                            table.insert(targets, {Part = hitbox, Model = obj})
-                        end
+                        if hitbox then table.insert(targets, {Part = hitbox, Model = obj}) end
                     end
                 end
             end
         end
     end
-
     return targets
 end
 
--- ================= BACKGROUND THREADS =================
-
--- 1. INSTANT PROXIMITY PROMPTS (BUILT-IN FEATURE)
 RunService.Stepped:Connect(function()
     for _, prompt in ipairs(Workspace:GetDescendants()) do
-        if prompt:IsA("ProximityPrompt") then
-            prompt.HoldDuration = 0
-        end
+        if prompt:IsA("ProximityPrompt") then prompt.HoldDuration = 0 end
     end
-
     if Config.EnableSpeed then
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = Config.PlayerSpeed
-        end
+        if hum then hum.WalkSpeed = Config.PlayerSpeed end
     end
 end)
 
--- 2. AUTO STEAL & SAFE ZONE RETURN
 task.spawn(function()
     while true do
         task.wait(0.1)
-
         if Config.AutoSteal then
             local targets = GetEggTargets()
-            
             for _, target in ipairs(targets) do
                 if not Config.AutoSteal then break end
-
                 local hitboxPart = target.Part
                 if hitboxPart and hitboxPart.Parent then
                     MoveToTarget(hitboxPart.CFrame + Vector3.new(0, 2, 0))
-
                     TouchPart(hitboxPart)
                     local prompt = target.Model:FindFirstChildWhichIsA("ProximityPrompt", true) or hitboxPart:FindFirstChildWhichIsA("ProximityPrompt")
                     if prompt then
                         prompt.HoldDuration = 0
                         pcall(function() fireproximityprompt(prompt) end)
                     end
-
                     task.wait(0.15)
-
-                    local safeZoneCFrame = GetSafeZoneCFrame()
-                    MoveToTarget(safeZoneCFrame)
-                    
+                    MoveToTarget(GetSafeZoneCFrame())
                     task.wait(0.2)
                 end
             end
@@ -280,46 +201,36 @@ task.spawn(function()
     end
 end)
 
--- 3. AUTO HIT ENGINE
 task.spawn(function()
     while task.wait(0.08) do
         if Config.AutoHit then
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local tool = char and char:FindFirstChildOfClass("Tool")
-
             if hrp and tool then
                 local targetFound = false
-
                 for _, obj in ipairs(Workspace:GetDescendants()) do
                     if (obj:IsA("Model") and obj ~= char and obj:FindFirstChildOfClass("Humanoid")) or (obj.Name == "Hitbox" and obj.Parent ~= char and not obj:IsDescendantOf(char)) then
                         local targetPart = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart")) or obj
-                        
                         if targetPart and targetPart:IsA("BasePart") then
-                            local dist = (targetPart.Position - hrp.Position).Magnitude
-                            if dist <= Config.HitRange then
+                            if (targetPart.Position - hrp.Position).Magnitude <= Config.HitRange then
                                 targetFound = true
                                 break
                             end
                         end
                     end
                 end
-
-                if targetFound then
-                    tool:Activate()
-                end
+                if targetFound then tool:Activate() end
             end
         end
     end
 end)
 
--- 4. AUTO PLACE EGG
 task.spawn(function()
     while task.wait(0.25) do
         if Config.AutoPlaceEgg then
             local char = LocalPlayer.Character
             local backpack = LocalPlayer:FindFirstChild("Backpack")
-
             if char and backpack then
                 local eggTool = nil
                 for _, tool in ipairs(backpack:GetChildren()) do
@@ -329,7 +240,6 @@ task.spawn(function()
                         break
                     end
                 end
-
                 if not eggTool then
                     for _, tool in ipairs(char:GetChildren()) do
                         if tool:IsA("Tool") and (tool.Name:lower():find("egg") or tool.Name:lower():find("steal")) then
@@ -338,16 +248,12 @@ task.spawn(function()
                         end
                     end
                 end
-
                 if eggTool then
                     local myPlot = GetMyPlot()
                     if myPlot then
-                        local safeCFrame = GetSafeZoneCFrame()
-                        MoveToTarget(safeCFrame)
+                        MoveToTarget(GetSafeZoneCFrame())
                         task.wait(0.1)
-
                         eggTool:Activate()
-
                         for _, desc in ipairs(myPlot:GetDescendants()) do
                             if desc:IsA("ProximityPrompt") then
                                 desc.HoldDuration = 0
@@ -363,7 +269,6 @@ task.spawn(function()
     end
 end)
 
--- 5. AUTO HATCH
 task.spawn(function()
     while task.wait(0.25) do
         if Config.AutoHatch then
@@ -371,13 +276,11 @@ task.spawn(function()
                 if descendant:IsA("TextButton") or descendant:IsA("ImageButton") then
                     local name = descendant.Name:lower()
                     local text = (descendant:IsA("TextButton") and descendant.Text or ""):lower()
-                    
                     if name:find("hatch") or text:find("hatch") or name:find("claim") or text:find("claim") or text:find("open") then
                         ClickButton(descendant)
                     end
                 end
             end
-
             local myPlot = GetMyPlot()
             if myPlot then
                 for _, desc in ipairs(myPlot:GetDescendants()) do
@@ -395,7 +298,6 @@ task.spawn(function()
     end
 end)
 
--- 6. AUTO UPGRADES
 task.spawn(function()
     while task.wait(0.3) do
         local myPlot = GetMyPlot()
@@ -404,24 +306,17 @@ task.spawn(function()
                 local treadmillModel = myPlot:FindFirstChild("TreadmillUpgrade") or myPlot:FindFirstChild("Treadmill")
                 if treadmillModel then
                     for _, part in ipairs(treadmillModel:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            TouchPart(part)
-                        elseif part:IsA("TextButton") or part:IsA("ImageButton") then
-                            ClickButton(part)
-                        end
+                        if part:IsA("BasePart") then TouchPart(part)
+                        elseif part:IsA("TextButton") or part:IsA("ImageButton") then ClickButton(part) end
                     end
                 end
             end
-
             if Config.AutoUpgradePen then
                 local penModel = myPlot:FindFirstChild("PlotUpgrade") or myPlot:FindFirstChild("PenUpgrade") or myPlot:FindFirstChild("Plot")
                 if penModel then
                     for _, part in ipairs(penModel:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            TouchPart(part)
-                        elseif part:IsA("TextButton") or part:IsA("ImageButton") then
-                            ClickButton(part)
-                        end
+                        if part:IsA("BasePart") then TouchPart(part)
+                        elseif part:IsA("TextButton") or part:IsA("ImageButton") then ClickButton(part) end
                     end
                 end
             end
@@ -429,13 +324,12 @@ task.spawn(function()
     end
 end)
 
--- ================= GUI DESIGN =================
+-- GUI Construction
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "StealAnEggHubV7"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
--- FLOATING TOGGLE BUTTON
 local OpenToggleBtn = Instance.new("TextButton")
 OpenToggleBtn.Size = UDim2.fromOffset(50, 50)
 OpenToggleBtn.Position = UDim2.new(0, 15, 0.5, -25)
@@ -446,14 +340,13 @@ OpenToggleBtn.Font = Enum.Font.GothamBold
 OpenToggleBtn.TextSize = 13
 OpenToggleBtn.Active = true
 OpenToggleBtn.Parent = ScreenGui
-
 Instance.new("UICorner", OpenToggleBtn).CornerRadius = UDim.new(1, 0)
+
 local ToggleStroke = Instance.new("UIStroke")
 ToggleStroke.Color = Color3.fromRGB(255, 255, 255)
 ToggleStroke.Thickness = 2
 ToggleStroke.Parent = OpenToggleBtn
 
--- MAIN FRAME
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.fromOffset(360, 430)
 MainFrame.Position = UDim2.new(0.5, -180, 0.5, -215)
@@ -462,7 +355,6 @@ MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
-
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local FrameStroke = Instance.new("UIStroke")
@@ -470,43 +362,21 @@ FrameStroke.Color = Color3.fromRGB(0, 210, 255)
 FrameStroke.Thickness = 2
 FrameStroke.Parent = MainFrame
 
--- ANIMATED OPEN / CLOSE CONTROLLER
 local isGuiOpen = true
-
 local function SetGuiState(state)
     isGuiOpen = state
     if isGuiOpen then
         MainFrame.Visible = true
-        MainFrame:TweenSizeAndPosition(
-            UDim2.fromOffset(360, 430),
-            UDim2.new(0.5, -180, 0.5, -215),
-            Enum.EasingDirection.Out,
-            Enum.EasingStyle.Back,
-            0.3,
-            true
-        )
+        MainFrame:TweenSizeAndPosition(UDim2.fromOffset(360, 430), UDim2.new(0.5, -180, 0.5, -215), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.3, true)
     else
-        MainFrame:TweenSizeAndPosition(
-            UDim2.fromOffset(0, 0),
-            UDim2.new(0.5, 0, 0.5, 0),
-            Enum.EasingDirection.In,
-            Enum.EasingStyle.Back,
-            0.25,
-            true,
-            function()
-                if not isGuiOpen then
-                    MainFrame.Visible = false
-                end
-            end
-        )
+        MainFrame:TweenSizeAndPosition(UDim2.fromOffset(0, 0), UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.In, Enum.EasingStyle.Back, 0.25, true, function()
+            if not isGuiOpen then MainFrame.Visible = false end
+        end)
     end
 end
 
-BindClick(OpenToggleBtn, function()
-    SetGuiState(not isGuiOpen)
-end)
+BindClick(OpenToggleBtn, function() SetGuiState(not isGuiOpen) end)
 
--- TOP BAR
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 40)
 TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
@@ -534,11 +404,8 @@ CloseBtn.TextSize = 13
 CloseBtn.Parent = TopBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
-BindClick(CloseBtn, function()
-    SetGuiState(false)
-end)
+BindClick(CloseBtn, function() SetGuiState(false) end)
 
--- TAB BAR
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -12, 0, 32)
 TabBar.Position = UDim2.new(0, 6, 0, 44)
@@ -551,7 +418,6 @@ TabLayout.Padding = UDim.new(0, 4)
 TabLayout.Parent = TabBar
 
 local TabFrames = {}
-
 local function CreateTab(tabName)
     local tabBtn = Instance.new("TextButton")
     tabBtn.Size = UDim2.new(0.24, 0, 1, 0)
@@ -605,7 +471,6 @@ TabFrames["Steal"].Container.Visible = true
 TabFrames["Steal"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
 TabFrames["Steal"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
 
--- DRAGGABLE LOGIC FOR TOUCH & MOUSE
 local dragging, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -618,9 +483,8 @@ UserInputService.InputChanged:Connect(function(input)
         MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
-UserInputService.InputEnded:Connect(function(input) dragging = false end)
+UserInputService.InputEnded:Connect(function() dragging = false end)
 
--- UI BUILDER FUNCTIONS
 local function CreateToggle(parent, text, configKey)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, -4, 0, 38)
@@ -743,9 +607,6 @@ local function CreateInput(parent, text, configKey)
     end)
 end
 
--- ================= POPULATE CONTROLS =================
-
--- TAB 1: STEAL
 CreateToggle(StealTab, "Auto Steal & Safe Zone Return", "AutoSteal")
 CreateSelector(StealTab, "Steal Method", {"Tween", "Walk"}, "StealMethod")
 CreateInput(StealTab, "Tween Speed Value", "TweenSpeed")
@@ -753,14 +614,11 @@ CreateInput(StealTab, "Steal Walk Speed", "StealWalkSpeed")
 CreateToggle(StealTab, "Auto Place Egg", "AutoPlaceEgg")
 CreateToggle(StealTab, "Auto Hatch Egg", "AutoHatch")
 
--- TAB 2: COMBAT
 CreateToggle(CombatTab, "Auto Hit (Equipped Bat)", "AutoHit")
 CreateInput(CombatTab, "Hit Range (Studs)", "HitRange")
 
--- TAB 3: UPGRADES
 CreateToggle(UpgradesTab, "Auto Upgrade Treadmill", "AutoUpgradeTreadmill")
 CreateToggle(UpgradesTab, "Auto Upgrade Pen", "AutoUpgradePen")
 
--- TAB 4: PLAYER
 CreateToggle(PlayerTab, "Enable Speed Boost", "EnableSpeed")
 CreateInput(PlayerTab, "Player WalkSpeed", "PlayerSpeed")
