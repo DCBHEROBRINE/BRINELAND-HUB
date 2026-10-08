@@ -167,7 +167,7 @@ local function RunTaxiBoss()
     Title.Size = UDim2.new(1, -85, 1, 0)
     Title.Position = UDim2.new(0, 10, 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "<b>TAXI BOSS</b> <font color=\"#00E5FF\">DEX HUB</font>"
+    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">TAXI BOSS HUB</font>"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold
     Title.TextSize = 13
@@ -332,7 +332,7 @@ local function RunTaxiBoss()
 end
 
 local function RunStealAnEgg()
-    -- Steal An Egg Hub V7
+    -- Steal An Egg Hub BRINELAND
     local TweenService     = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local Workspace        = game:GetService("Workspace")
@@ -721,7 +721,7 @@ local function RunStealAnEgg()
     Title.Size = UDim2.new(1, -70, 1, 0)
     Title.Position = UDim2.new(0, 12, 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "<b>STEAL AN EGG HUB V7</b>"
+    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">STEAL AN EGG</font>"
     Title.TextColor3 = Color3.fromRGB(0, 225, 255)
     Title.Font = Enum.Font.GothamBold
     Title.TextSize = 13
@@ -967,7 +967,7 @@ local function RunStealAnEgg()
 end
 
 local function RunKeyboardEscape()
-    -- +1 Speed Keyboard Escape (Brineland)
+    -- +1 Speed Keyboard Escape (BRINELAND)
     if _G.BrinelandScriptLoaded then return end
     _G.BrinelandScriptLoaded = true
 
@@ -976,8 +976,8 @@ local function RunKeyboardEscape()
     local LocalPlayer = Players.LocalPlayer
     local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
-    local customName = "Brineland"
-    local customAnimName = "Brineland"
+    local customName = "BRINELAND"
+    local customAnimName = "BRINELAND"
     local unlockPacks = {"Premium", "Water", "Bubble", "Christmas", "Lava", "Honey", "Snow", "Slime", customAnimName}
 
     for _, packName in ipairs(unlockPacks) do
@@ -1029,7 +1029,7 @@ local function RunKeyboardEscape()
 end
 
 local function RunUniversalScript()
-    -- Universal Advanced DEX Hub (Fallback Engine)
+    -- Universal BRINELAND Hub (Fallback Engine)
     local TweenService     = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local Workspace        = game:GetService("Workspace")
@@ -1038,8 +1038,8 @@ local function RunUniversalScript()
     local LocalPlayer      = Players.LocalPlayer
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    if PlayerGui:FindFirstChild("UniversalDexHub") then
-        PlayerGui.UniversalDexHub:Destroy()
+    if PlayerGui:FindFirstChild("BrinelandUniversalHub") then
+        PlayerGui.BrinelandUniversalHub:Destroy()
     end
 
     local Config = {
@@ -1049,7 +1049,7 @@ local function RunUniversalScript()
         FlySpeed     = 50,
         Noclip       = false,
         PlayerESP    = false,
-        SavedCFrame  = nil
+        SavedCFrames = { nil, nil, nil, nil, nil }
     }
 
     -- Fly Engine Variables
@@ -1133,7 +1133,7 @@ local function RunUniversalScript()
             if espStorage[player] then espStorage[player]:Destroy() end
 
             local highlight = Instance.new("Highlight")
-            highlight.Name = "UniversalESPHighlight"
+            highlight.Name = "BrinelandESPHighlight"
             highlight.FillColor = Color3.fromRGB(0, 229, 255)
             highlight.OutlineColor = Color3.fromRGB(150, 85, 255)
             highlight.FillTransparency = 0.5
@@ -1167,13 +1167,13 @@ local function RunUniversalScript()
 
     -- GUI Construction
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "UniversalDexHub"
+    ScreenGui.Name = "BrinelandUniversalHub"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = PlayerGui
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(340, 390)
-    MainFrame.Position = UDim2.new(0.5, -170, 0.5, -195)
+    MainFrame.Size = UDim2.fromOffset(350, 420)
+    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -210)
     MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
@@ -1206,7 +1206,7 @@ local function RunUniversalScript()
     Title.Size = UDim2.new(1, -85, 1, 0)
     Title.Position = UDim2.new(0, 10, 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "<b>UNIVERSAL</b> <font color=\"#00E5FF\">DEX HUB</font>"
+    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">UNIVERSAL HUB</font>"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold
     Title.TextSize = 13
@@ -1250,15 +1250,19 @@ local function RunUniversalScript()
     Layout.Padding = UDim.new(0, 6)
     Layout.Parent = Container
 
+    Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Container.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 16)
+    end)
+
     local isMinimized = false
     MinimizeBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         if isMinimized then
             Container.Visible = false
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(340, 40)}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(350, 40)}):Play()
             MinimizeBtn.Text = "<b>+</b>"
         else
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(340, 390)}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(350, 420)}):Play()
             task.wait(0.15)
             Container.Visible = true
             MinimizeBtn.Text = "<b>–</b>"
@@ -1389,59 +1393,98 @@ local function RunUniversalScript()
         end)
     end
 
-    local function CreateTeleportButtons()
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -4, 0, 40)
-        frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
-        frame.Parent = Container
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    local function CreateMultiTeleportSection()
+        local header = Instance.new("TextLabel")
+        header.Size = UDim2.new(1, -4, 0, 22)
+        header.BackgroundTransparency = 1
+        header.Text = "<b>TELEPORT LOCATIONS (5 SLOTS)</b>"
+        header.TextColor3 = Color3.fromRGB(0, 229, 255)
+        header.Font = Enum.Font.GothamBold
+        header.TextSize = 11
+        header.RichText = true
+        header.TextXAlignment = Enum.TextXAlignment.Left
+        header.Parent = Container
 
-        local setBtn = Instance.new("TextButton")
-        setBtn.Size = UDim2.new(0.48, -4, 1, -8)
-        setBtn.Position = UDim2.new(0, 4, 0, 4)
-        setBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
-        setBtn.Text = "<b>SET TP</b>"
-        setBtn.TextColor3 = Color3.fromRGB(0, 229, 255)
-        setBtn.Font = Enum.Font.GothamBold
-        setBtn.TextSize = 11
-        setBtn.RichText = true
-        setBtn.Parent = frame
-        Instance.new("UICorner", setBtn).CornerRadius = UDim.new(0, 6)
+        for i = 1, 5 do
+            local slotFrame = Instance.new("Frame")
+            slotFrame.Size = UDim2.new(1, -4, 0, 52)
+            slotFrame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+            slotFrame.Parent = Container
+            Instance.new("UICorner", slotFrame).CornerRadius = UDim.new(0, 6)
 
-        local tpBtn = Instance.new("TextButton")
-        tpBtn.Size = UDim2.new(0.48, -4, 1, -8)
-        tpBtn.Position = UDim2.new(0.52, 0, 0, 4)
-        tpBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
-        tpBtn.Text = "<b>TP</b>"
-        tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tpBtn.Font = Enum.Font.GothamBold
-        tpBtn.TextSize = 11
-        tpBtn.RichText = true
-        tpBtn.Parent = frame
-        Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+            local slotTitle = Instance.new("TextLabel")
+            slotTitle.Size = UDim2.new(0.35, 0, 0, 22)
+            slotTitle.Position = UDim2.new(0, 10, 0, 4)
+            slotTitle.BackgroundTransparency = 1
+            slotTitle.Text = "<b>Slot " .. i .. "</b>"
+            slotTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+            slotTitle.Font = Enum.Font.GothamBold
+            slotTitle.TextSize = 11
+            slotTitle.RichText = true
+            slotTitle.TextXAlignment = Enum.TextXAlignment.Left
+            slotTitle.Parent = slotFrame
 
-        setBtn.MouseButton1Click:Connect(function()
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                Config.SavedCFrame = hrp.CFrame
-                setBtn.Text = "<b>SET DONE!</b>"
-                task.wait(1)
-                setBtn.Text = "<b>SET TP</b>"
-            end
-        end)
+            local coordText = Instance.new("TextLabel")
+            coordText.Size = UDim2.new(1, -20, 0, 18)
+            coordText.Position = UDim2.new(0, 10, 0, 28)
+            coordText.BackgroundTransparency = 1
+            coordText.Text = "<b>Coords: <font color=\"#888888\">Not Set</font></b>"
+            coordText.TextColor3 = Color3.fromRGB(200, 200, 200)
+            coordText.Font = Enum.Font.Gotham
+            coordText.TextSize = 10
+            coordText.RichText = true
+            coordText.TextXAlignment = Enum.TextXAlignment.Left
+            coordText.Parent = slotFrame
 
-        tpBtn.MouseButton1Click:Connect(function()
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp and Config.SavedCFrame then
-                hrp.CFrame = Config.SavedCFrame
-            end
-        end)
+            local setBtn = Instance.new("TextButton")
+            setBtn.Size = UDim2.fromOffset(60, 22)
+            setBtn.Position = UDim2.new(1, -132, 0, 4)
+            setBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
+            setBtn.Text = "<b>SET TP</b>"
+            setBtn.TextColor3 = Color3.fromRGB(0, 229, 255)
+            setBtn.Font = Enum.Font.GothamBold
+            setBtn.TextSize = 10
+            setBtn.RichText = true
+            setBtn.Parent = slotFrame
+            Instance.new("UICorner", setBtn).CornerRadius = UDim.new(0, 4)
+
+            local tpBtn = Instance.new("TextButton")
+            tpBtn.Size = UDim2.fromOffset(60, 22)
+            tpBtn.Position = UDim2.new(1, -66, 0, 4)
+            tpBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
+            tpBtn.Text = "<b>TP</b>"
+            tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            tpBtn.Font = Enum.Font.GothamBold
+            tpBtn.TextSize = 10
+            tpBtn.RichText = true
+            tpBtn.Parent = slotFrame
+            Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 4)
+
+            setBtn.MouseButton1Click:Connect(function()
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    Config.SavedCFrames[i] = hrp.CFrame
+                    local pos = hrp.Position
+                    coordText.Text = string.format("<b>Coords: <font color=\"#00E5FF\">X:%.1f, Y:%.1f, Z:%.1f</font></b>", pos.X, pos.Y, pos.Z)
+                    setBtn.Text = "<b>SET!</b>"
+                    task.wait(0.8)
+                    setBtn.Text = "<b>SET TP</b>"
+                end
+            end)
+
+            tpBtn.MouseButton1Click:Connect(function()
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp and Config.SavedCFrames[i] then
+                    hrp.CFrame = Config.SavedCFrames[i]
+                end
+            end)
+        end
     end
 
     -- Universal Script UI Layout
-    CreateTeleportButtons()
+    CreateMultiTeleportSection()
 
     CreateToggle("Enable WalkSpeed", function(state)
         Config.SpeedEnabled = state
@@ -1466,15 +1509,15 @@ end
 local nameLower = gameName:lower()
 
 if nameLower:find("taxi boss") or PlaceId == 7305826609 then
-    print("[Loader] Detected Taxi Boss. Executing script...")
+    print("[BRINELAND] Detected Taxi Boss. Executing script...")
     RunTaxiBoss()
 elseif nameLower:find("steal an egg") or PlaceId == 115049386348611 then
-    print("[Loader] Detected Steal An Egg. Executing script...")
+    print("[BRINELAND] Detected Steal An Egg. Executing script...")
     RunStealAnEgg()
 elseif nameLower:find("keyboard escape") or nameLower:find("+1 speed") then
-    print("[Loader] Detected +1 Speed Keyboard Escape. Executing script...")
+    print("[BRINELAND] Detected +1 Speed Keyboard Escape. Executing script...")
     RunKeyboardEscape()
 else
-    print("[Loader] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Script...")
+    print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Script...")
     RunUniversalScript()
 end
