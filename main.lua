@@ -1048,8 +1048,7 @@ local function RunUniversalScript()
         FlyEnabled   = false,
         FlySpeed     = 50,
         Noclip       = false,
-        PlayerESP    = false,
-        SavedCFrames = { nil, nil, nil, nil, nil }
+        PlayerESP    = false
     }
 
     -- Fly Engine Variables
@@ -1090,13 +1089,11 @@ local function RunUniversalScript()
         local char = LocalPlayer.Character
         if not char then return end
 
-        -- Speed Engine
         if Config.SpeedEnabled then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = Config.WalkSpeed end
         end
 
-        -- Noclip Engine
         if Config.Noclip then
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") and part.CanCollide then
@@ -1172,8 +1169,8 @@ local function RunUniversalScript()
     ScreenGui.Parent = PlayerGui
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(350, 420)
-    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -210)
+    MainFrame.Size = UDim2.fromOffset(360, 430)
+    MainFrame.Position = UDim2.new(0.5, -180, 0.5, -215)
     MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
@@ -1238,33 +1235,90 @@ local function RunUniversalScript()
     CloseBtn.Parent = TopBar
     CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
-    local Container = Instance.new("ScrollingFrame")
-    Container.Size = UDim2.new(1, -12, 1, -48)
-    Container.Position = UDim2.new(0, 6, 0, 44)
-    Container.BackgroundTransparency = 1
-    Container.ScrollBarThickness = 4
-    Container.ScrollBarImageColor3 = Color3.fromRGB(0, 229, 255)
-    Container.Parent = MainFrame
+    -- Tab Bar (Top Corner Sections)
+    local TabBar = Instance.new("Frame")
+    TabBar.Size = UDim2.new(1, -12, 0, 32)
+    TabBar.Position = UDim2.new(0, 6, 0, 44)
+    TabBar.BackgroundTransparency = 1
+    TabBar.Parent = MainFrame
 
-    local Layout = Instance.new("UIListLayout")
-    Layout.Padding = UDim.new(0, 6)
-    Layout.Parent = Container
+    local TabLayout = Instance.new("UIListLayout")
+    TabLayout.FillDirection = Enum.FillDirection.Horizontal
+    TabLayout.Padding = UDim.new(0, 4)
+    TabLayout.Parent = TabBar
 
-    Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        Container.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 16)
-    end)
+    local TabFrames = {}
+    local function CreateTab(tabName)
+        local tabBtn = Instance.new("TextButton")
+        tabBtn.Size = UDim2.new(0.32, 0, 1, 0)
+        tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
+        tabBtn.Text = "<b>" .. tabName .. "</b>"
+        tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
+        tabBtn.Font = Enum.Font.GothamBold
+        tabBtn.TextSize = 10
+        tabBtn.RichText = true
+        tabBtn.Parent = TabBar
+        Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
 
+        local container = Instance.new("ScrollingFrame")
+        container.Size = UDim2.new(1, -12, 1, -86)
+        container.Position = UDim2.new(0, 6, 0, 80)
+        container.BackgroundTransparency = 1
+        container.ScrollBarThickness = 4
+        container.ScrollBarImageColor3 = Color3.fromRGB(0, 229, 255)
+        container.Visible = false
+        container.Parent = MainFrame
+
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Padding = UDim.new(0, 6)
+        listLayout.Parent = container
+
+        listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            container.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 16)
+        end)
+
+        TabFrames[tabName] = { Button = tabBtn, Container = container }
+
+        tabBtn.MouseButton1Click:Connect(function()
+            for _, data in pairs(TabFrames) do
+                data.Container.Visible = false
+                data.Button.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
+                data.Button.TextColor3 = Color3.fromRGB(180, 180, 210)
+            end
+            container.Visible = true
+            tabBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
+            tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end)
+
+        return container
+    end
+
+    local TeleportsTab = CreateTab("Teleports")
+    local PlayerTab    = CreateTab("Player")
+    local VisualsTab   = CreateTab("Visuals")
+
+    TabFrames["Teleports"].Container.Visible = true
+    TabFrames["Teleports"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
+    TabFrames["Teleports"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    -- Window Controls
     local isMinimized = false
     MinimizeBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         if isMinimized then
-            Container.Visible = false
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(350, 40)}):Play()
+            for _, data in pairs(TabFrames) do data.Container.Visible = false end
+            TabBar.Visible = false
+            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(360, 40)}):Play()
             MinimizeBtn.Text = "<b>+</b>"
         else
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(350, 420)}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(360, 430)}):Play()
             task.wait(0.15)
-            Container.Visible = true
+            TabBar.Visible = true
+            for name, data in pairs(TabFrames) do
+                if data.Button.BackgroundColor3 == Color3.fromRGB(0, 160, 240) then
+                    data.Container.Visible = true
+                end
+            end
             MinimizeBtn.Text = "<b>–</b>"
         end
     end)
@@ -1283,11 +1337,12 @@ local function RunUniversalScript()
     end)
     UserInputService.InputEnded:Connect(function() dragging = false end)
 
-    local function CreateToggle(text, callback)
+    -- UI Component Creators
+    local function CreateToggle(parentContainer, text, callback)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 40)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
-        frame.Parent = Container
+        frame.Parent = parentContainer
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
         local lbl = Instance.new("TextLabel")
@@ -1331,11 +1386,11 @@ local function RunUniversalScript()
         end)
     end
 
-    local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
+    local function CreateSlider(parentContainer, text, minVal, maxVal, defaultVal, callback)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 48)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
-        frame.Parent = Container
+        frame.Parent = parentContainer
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
         local lbl = Instance.new("TextLabel")
@@ -1393,116 +1448,108 @@ local function RunUniversalScript()
         end)
     end
 
-    local function CreateMultiTeleportSection()
-        local header = Instance.new("TextLabel")
-        header.Size = UDim2.new(1, -4, 0, 22)
-        header.BackgroundTransparency = 1
-        header.Text = "<b>TELEPORT LOCATIONS (5 SLOTS)</b>"
-        header.TextColor3 = Color3.fromRGB(0, 229, 255)
-        header.Font = Enum.Font.GothamBold
-        header.TextSize = 11
-        header.RichText = true
-        header.TextXAlignment = Enum.TextXAlignment.Left
-        header.Parent = Container
+    -- DYNAMIC TELEPORT SYSTEM (Requested Change)
+    local function SetupDynamicTeleportSystem()
+        local setBtnFrame = Instance.new("Frame")
+        setBtnFrame.Size = UDim2.new(1, -4, 0, 44)
+        setBtnFrame.BackgroundColor3 = Color3.fromRGB(0, 170, 240)
+        setBtnFrame.Parent = TeleportsTab
+        Instance.new("UICorner", setBtnFrame).CornerRadius = UDim.new(0, 6)
 
-        for i = 1, 5 do
-            local slotFrame = Instance.new("Frame")
-            slotFrame.Size = UDim2.new(1, -4, 0, 52)
-            slotFrame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
-            slotFrame.Parent = Container
-            Instance.new("UICorner", slotFrame).CornerRadius = UDim.new(0, 6)
+        local setBtn = Instance.new("TextButton")
+        setBtn.Size = UDim2.new(1, 0, 1, 0)
+        setBtn.BackgroundTransparency = 1
+        setBtn.Text = "<b>+ SAVE CURRENT LOCATION (SET TP)</b>"
+        setBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        setBtn.Font = Enum.Font.GothamBold
+        setBtn.TextSize = 12
+        setBtn.RichText = true
+        setBtn.Parent = setBtnFrame
 
-            local slotTitle = Instance.new("TextLabel")
-            slotTitle.Size = UDim2.new(0.35, 0, 0, 22)
-            slotTitle.Position = UDim2.new(0, 10, 0, 4)
-            slotTitle.BackgroundTransparency = 1
-            slotTitle.Text = "<b>Slot " .. i .. "</b>"
-            slotTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-            slotTitle.Font = Enum.Font.GothamBold
-            slotTitle.TextSize = 11
-            slotTitle.RichText = true
-            slotTitle.TextXAlignment = Enum.TextXAlignment.Left
-            slotTitle.Parent = slotFrame
+        local tpListContainer = Instance.new("Frame")
+        tpListContainer.Size = UDim2.new(1, 0, 0, 0)
+        tpListContainer.BackgroundTransparency = 1
+        tpListContainer.Parent = TeleportsTab
 
-            local coordText = Instance.new("TextLabel")
-            coordText.Size = UDim2.new(1, -20, 0, 18)
-            coordText.Position = UDim2.new(0, 10, 0, 28)
-            coordText.BackgroundTransparency = 1
-            coordText.Text = "<b>Coords: <font color=\"#888888\">Not Set</font></b>"
-            coordText.TextColor3 = Color3.fromRGB(200, 200, 200)
-            coordText.Font = Enum.Font.Gotham
-            coordText.TextSize = 10
-            coordText.RichText = true
-            coordText.TextXAlignment = Enum.TextXAlignment.Left
-            coordText.Parent = slotFrame
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Padding = UDim.new(0, 6)
+        listLayout.Parent = tpListContainer
 
-            local setBtn = Instance.new("TextButton")
-            setBtn.Size = UDim2.fromOffset(60, 22)
-            setBtn.Position = UDim2.new(1, -132, 0, 4)
-            setBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
-            setBtn.Text = "<b>SET TP</b>"
-            setBtn.TextColor3 = Color3.fromRGB(0, 229, 255)
-            setBtn.Font = Enum.Font.GothamBold
-            setBtn.TextSize = 10
-            setBtn.RichText = true
-            setBtn.Parent = slotFrame
-            Instance.new("UICorner", setBtn).CornerRadius = UDim.new(0, 4)
+        listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            tpListContainer.Size = UDim2.new(1, 0, 0, listLayout.AbsoluteContentSize.Y)
+        end)
 
-            local tpBtn = Instance.new("TextButton")
-            tpBtn.Size = UDim2.fromOffset(60, 22)
-            tpBtn.Position = UDim2.new(1, -66, 0, 4)
-            tpBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
-            tpBtn.Text = "<b>TP</b>"
-            tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            tpBtn.Font = Enum.Font.GothamBold
-            tpBtn.TextSize = 10
-            tpBtn.RichText = true
-            tpBtn.Parent = slotFrame
-            Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 4)
+        setBtn.MouseButton1Click:Connect(function()
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local savedCFrame = hrp.CFrame
+                local pos = hrp.Position
 
-            setBtn.MouseButton1Click:Connect(function()
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    Config.SavedCFrames[i] = hrp.CFrame
-                    local pos = hrp.Position
-                    coordText.Text = string.format("<b>Coords: <font color=\"#00E5FF\">X:%.1f, Y:%.1f, Z:%.1f</font></b>", pos.X, pos.Y, pos.Z)
-                    setBtn.Text = "<b>SET!</b>"
-                    task.wait(0.8)
-                    setBtn.Text = "<b>SET TP</b>"
-                end
-            end)
+                local slotFrame = Instance.new("Frame")
+                slotFrame.Size = UDim2.new(1, -4, 0, 44)
+                slotFrame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+                slotFrame.Parent = tpListContainer
+                Instance.new("UICorner", slotFrame).CornerRadius = UDim.new(0, 6)
 
-            tpBtn.MouseButton1Click:Connect(function()
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp and Config.SavedCFrames[i] then
-                    hrp.CFrame = Config.SavedCFrames[i]
-                end
-            end)
-        end
+                local tpBtn = Instance.new("TextButton")
+                tpBtn.Size = UDim2.new(1, -45, 1, 0)
+                tpBtn.Position = UDim2.new(0, 5, 0, 0)
+                tpBtn.BackgroundTransparency = 1
+                tpBtn.Text = string.format("<b>TP <font color=\"#00E5FF\">[ X:%.1f, Y:%.1f, Z:%.1f ]</font></b>", pos.X, pos.Y, pos.Z)
+                tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                tpBtn.Font = Enum.Font.GothamBold
+                tpBtn.TextSize = 11
+                tpBtn.RichText = true
+                tpBtn.TextXAlignment = Enum.TextXAlignment.Left
+                tpBtn.Parent = slotFrame
+
+                local delBtn = Instance.new("TextButton")
+                delBtn.Size = UDim2.fromOffset(30, 30)
+                delBtn.Position = UDim2.new(1, -35, 0.5, -15)
+                delBtn.BackgroundColor3 = Color3.fromRGB(220, 35, 70)
+                delBtn.Text = "<b>X</b>"
+                delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                delBtn.Font = Enum.Font.GothamBold
+                delBtn.TextSize = 12
+                delBtn.RichText = true
+                delBtn.Parent = slotFrame
+                Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 4)
+
+                tpBtn.MouseButton1Click:Connect(function()
+                    local c = LocalPlayer.Character
+                    local h = c and c:FindFirstChild("HumanoidRootPart")
+                    if h then h.CFrame = savedCFrame end
+                end)
+
+                delBtn.MouseButton1Click:Connect(function()
+                    slotFrame:Destroy()
+                end)
+            end
+        end)
     end
 
-    -- Universal Script UI Layout
-    CreateMultiTeleportSection()
+    -- Assign UI Elements to specific Tabs
+    SetupDynamicTeleportSystem()
 
-    CreateToggle("Enable WalkSpeed", function(state)
+    CreateToggle(PlayerTab, "Enable WalkSpeed", function(state)
         Config.SpeedEnabled = state
         if not state and LocalPlayer.Character then
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = 16 end
         end
     end)
-    CreateSlider("Player Speed", 16, 300, Config.WalkSpeed, function(val) Config.WalkSpeed = val end)
+    CreateSlider(PlayerTab, "Player Speed", 16, 300, Config.WalkSpeed, function(val) Config.WalkSpeed = val end)
 
-    CreateToggle("Enable Fly", function(state)
+    CreateToggle(PlayerTab, "Enable Fly", function(state)
         Config.FlyEnabled = state
         if state then EnableFly() else DisableFly() end
     end)
-    CreateSlider("Fly Speed", 10, 300, Config.FlySpeed, function(val) Config.FlySpeed = val end)
+    CreateSlider(PlayerTab, "Fly Speed", 10, 300, Config.FlySpeed, function(val) Config.FlySpeed = val end)
 
-    CreateToggle("Noclip", function(state) Config.Noclip = state end)
-    CreateToggle("Player ESP", function(state) ToggleESPState(state) end)
+    CreateToggle(PlayerTab, "Noclip", function(state) Config.Noclip = state end)
+    
+    CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
 end
 
 -- Detection Logic
