@@ -1,19 +1,42 @@
+--[[
+    =================================================[span_32](start_span)[span_32](end_span)===========
+    MASTER MULTI-GAME HUB LOADER (BRINELAND SYSTEM)
+    Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
+    
+    Includes:
+      - Automatic Place ID & Game[span_10](start_span)[span_10](end_span) Title Router
+      - Dedicated Modules:
+        1. Taxi Boss Ground-Truth Mobile Hub
+        2. Steal An Egg Hub V7
+        3. +1 Speed Keyboard Escape (Brineland Hub)
+      - Universal Fallback Hub featuring:
+        * Dynamic SET TP Navigation Component
+        * Instant TP (Immediate CFrame assignment)
+        * Autonomous Walk (PathfindingService + Humanoid:MoveTo)
+        * Smooth CFrame Tween (TweenService with velocity duration)
+        * Speed & Fly Controls, Noclip, and Player ESP
+    ============================================================
+]]
+
 local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local PlaceId = game.PlaceId
 
+-- Retrieve Game Title Safely
 local success, info = pcall(function()
     return MarketplaceService:GetProductInfo(PlaceId)
 end)
-local gameName = (success and info and info.Name) or ""
+local gameName = (success and info and info.Name) and info.Name:lower() or ""
 
+-- ============================================================
+-- SCRIPT 1: TAXI BOSS GROUND-TRUTH MOBILE HUB
+-- ============================================================
 local function RunTaxiBoss()
-    -- Taxi Boss Ground-Truth Mobile Hub
     local TweenService     = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local Workspace        = game:GetService("Workspace")
     local RunService       = game:GetService("RunService")
-    local Players          = game:GetService("Players")
-    local LocalPlayer      = Players.LocalPlayer
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     if PlayerGui:FindFirstChild("TaxiBossCustomHub") then
@@ -125,7 +148,6 @@ local function RunTaxiBoss()
         end
     end)
 
-    -- GUI Construction
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "TaxiBossCustomHub"
     ScreenGui.ResetOnSpawn = false
@@ -331,8 +353,10 @@ local function RunTaxiBoss()
     CreateInput("Player WalkSpeed", Config.PlayerSpeed, function(val) Config.PlayerSpeed = val end)
 end
 
+-- ============================================================
+-- SCRIPT 2: STEAL AN EGG HUB
+-- ============================================================
 local function RunStealAnEgg()
-    -- Steal An Egg Hub BRINELAND
     local TweenService     = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local Workspace        = game:GetService("Workspace")
@@ -1048,10 +1072,77 @@ local function RunUniversalScript()
         FlyEnabled   = false,
         FlySpeed     = 50,
         Noclip       = false,
-        PlayerESP    = false
+        PlayerESP    = false,
+        SavedCFrame  = nil,
+        TweenSpeed   = 80,
+        WalkSpeedNav = 28
     }
 
-    -- Fly Engine Variables
+    -- Movement Helper Functions
+    local activeTween = nil
+    local activeWalkThread = nil
+
+    local function StopMovementThreads()
+        if activeTween then
+            activeTween:Cancel()
+            activeTween = nil
+        end
+        if activeWalkThread then
+            task.cancel(activeWalkThread)
+            activeWalkThread = nil
+        end
+    end
+
+    local function TweenToCFrame(targetCFrame)
+        StopMovementThreads()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local dist = (hrp.Position - targetCFrame.Position).Magnitude
+        local duration = math.max(0.05, dist / math.max(1, Config.TweenSpeed))
+
+        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+        activeTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+        activeTween:Play()
+    end
+
+    local function WalkToPosition(targetPosition)
+        StopMovementThreads()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+
+        activeWalkThread = task.spawn(function()
+            local PathfindingService = game:GetService("PathfindingService")
+            local path = PathfindingService:CreatePath({
+                AgentRadius = 2,
+                AgentHeight = 5,
+                AgentCanJump = true
+            })
+
+            local success, err = pcall(function()
+                path:ComputeAsync(hrp.Position, targetPosition)
+            end)
+
+            if success and path.Status == Enum.PathStatus.Success then
+                local waypoints = path:GetWaypoints()
+                for _, waypoint in ipairs(waypoints) do
+                    if waypoint.Action == Enum.PathWaypointAction.Jump then
+                        hum.Jump = true
+                    end
+                    hum:MoveTo(waypoint.Position)
+                    local reached = hum.MoveToFinished:Wait()
+                    if not reached then break end
+                end
+            else
+                hum:MoveTo(targetPosition)
+            end
+        end)
+    end
+
+    -- Fly Engine
     local flyVelocity, flyGyro
 
     local function EnableFly()
@@ -1169,8 +1260,8 @@ local function RunUniversalScript()
     ScreenGui.Parent = PlayerGui
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(360, 430)
-    MainFrame.Position = UDim2.new(0.5, -180, 0.5, -215)
+    MainFrame.Size = UDim2.fromOffset(350, 440)
+    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -220)
     MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
@@ -1235,90 +1326,33 @@ local function RunUniversalScript()
     CloseBtn.Parent = TopBar
     CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
-    -- Tab Bar (Top Corner Sections)
-    local TabBar = Instance.new("Frame")
-    TabBar.Size = UDim2.new(1, -12, 0, 32)
-    TabBar.Position = UDim2.new(0, 6, 0, 44)
-    TabBar.BackgroundTransparency = 1
-    TabBar.Parent = MainFrame
+    local Container = Instance.new("ScrollingFrame")
+    Container.Size = UDim2.new(1, -12, 1, -48)
+    Container.Position = UDim2.new(0, 6, 0, 44)
+    Container.BackgroundTransparency = 1
+    Container.ScrollBarThickness = 4
+    Container.ScrollBarImageColor3 = Color3.fromRGB(0, 229, 255)
+    Container.Parent = MainFrame
 
-    local TabLayout = Instance.new("UIListLayout")
-    TabLayout.FillDirection = Enum.FillDirection.Horizontal
-    TabLayout.Padding = UDim.new(0, 4)
-    TabLayout.Parent = TabBar
+    local Layout = Instance.new("UIListLayout")
+    Layout.Padding = UDim.new(0, 6)
+    Layout.Parent = Container
 
-    local TabFrames = {}
-    local function CreateTab(tabName)
-        local tabBtn = Instance.new("TextButton")
-        tabBtn.Size = UDim2.new(0.32, 0, 1, 0)
-        tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
-        tabBtn.Text = "<b>" .. tabName .. "</b>"
-        tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
-        tabBtn.Font = Enum.Font.GothamBold
-        tabBtn.TextSize = 10
-        tabBtn.RichText = true
-        tabBtn.Parent = TabBar
-        Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
+    Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Container.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 16)
+    end)
 
-        local container = Instance.new("ScrollingFrame")
-        container.Size = UDim2.new(1, -12, 1, -86)
-        container.Position = UDim2.new(0, 6, 0, 80)
-        container.BackgroundTransparency = 1
-        container.ScrollBarThickness = 4
-        container.ScrollBarImageColor3 = Color3.fromRGB(0, 229, 255)
-        container.Visible = false
-        container.Parent = MainFrame
-
-        local listLayout = Instance.new("UIListLayout")
-        listLayout.Padding = UDim.new(0, 6)
-        listLayout.Parent = container
-
-        listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            container.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 16)
-        end)
-
-        TabFrames[tabName] = { Button = tabBtn, Container = container }
-
-        tabBtn.MouseButton1Click:Connect(function()
-            for _, data in pairs(TabFrames) do
-                data.Container.Visible = false
-                data.Button.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
-                data.Button.TextColor3 = Color3.fromRGB(180, 180, 210)
-            end
-            container.Visible = true
-            tabBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
-            tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        end)
-
-        return container
-    end
-
-    local TeleportsTab = CreateTab("Teleports")
-    local PlayerTab    = CreateTab("Player")
-    local VisualsTab   = CreateTab("Visuals")
-
-    TabFrames["Teleports"].Container.Visible = true
-    TabFrames["Teleports"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
-    TabFrames["Teleports"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-    -- Window Controls
     local isMinimized = false
     MinimizeBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         if isMinimized then
-            for _, data in pairs(TabFrames) do data.Container.Visible = false end
-            TabBar.Visible = false
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(360, 40)}):Play()
+            Container.Visible = false
+            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(350, 40)}):Play()
             MinimizeBtn.Text = "<b>+</b>"
         else
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(360, 430)}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(350, 420)}):Play()
             task.wait(0.15)
-            TabBar.Visible = true
-            for name, data in pairs(TabFrames) do
-                if data.Button.BackgroundColor3 == Color3.fromRGB(0, 160, 240) then
-                    data.Container.Visible = true
-                end
-            end
+            Container.Visible = true
             MinimizeBtn.Text = "<b>–</b>"
         end
     end)
@@ -1337,7 +1371,6 @@ local function RunUniversalScript()
     end)
     UserInputService.InputEnded:Connect(function() dragging = false end)
 
-    -- UI Component Creators
     local function CreateToggle(parentContainer, text, callback)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 40)
@@ -1448,111 +1481,218 @@ local function RunUniversalScript()
         end)
     end
 
-    -- DYNAMIC TELEPORT SYSTEM (Requested Change)
-    local function SetupDynamicTeleportSystem()
-        local setBtnFrame = Instance.new("Frame")
-        setBtnFrame.Size = UDim2.new(1, -4, 0, 44)
-        setBtnFrame.BackgroundColor3 = Color3.fromRGB(0, 170, 240)
-        setBtnFrame.Parent = TeleportsTab
-        Instance.new("UICorner", setBtnFrame).CornerRadius = UDim.new(0, 6)
+    -- NAVIGATION COMPONENT (EXACT HAND-DRAWN SPECIFICATION)
+    local function SetupNavigationComponent(parentContainer)
+        local tpContainer = Instance.new("Frame")
+        tpContainer.Size = UDim2.new(1, -4, 0, 44)
+        tpContainer.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        tpContainer.Parent = parentContainer
+        Instance.new("UICorner", tpContainer).CornerRadius = UDim.new(0, 6)
 
-        local setBtn = Instance.new("TextButton")
-        setBtn.Size = UDim2.new(1, 0, 1, 0)
-        setBtn.BackgroundTransparency = 1
-        setBtn.Text = "<b>+ SAVE CURRENT LOCATION (SET TP)</b>"
-        setBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        setBtn.Font = Enum.Font.GothamBold
-        setBtn.TextSize = 12
-        setBtn.RichText = true
-        setBtn.Parent = setBtnFrame
+        local setTpBtn = Instance.new("TextButton")
+        setTpBtn.Size = UDim2.new(1, -12, 0, 32)
+        setTpBtn.Position = UDim2.new(0, 6, 0, 6)
+        setTpBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 240)
+        setTpBtn.Text = "<b>SET TP LOCATION</b>"
+        setTpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        setTpBtn.Font = Enum.Font.GothamBold
+        setTpBtn.TextSize = 12
+        setTpBtn.RichText = true
+        setTpBtn.Parent = tpContainer
+        Instance.new("UICorner", setTpBtn).CornerRadius = UDim.new(0, 6)
 
-        local tpListContainer = Instance.new("Frame")
-        tpListContainer.Size = UDim2.new(1, 0, 0, 0)
-        tpListContainer.BackgroundTransparency = 1
-        tpListContainer.Parent = TeleportsTab
+        -- Revealed Action Group
+        local actionGroup = Instance.new("Frame")
+        actionGroup.Size = UDim2.new(1, -12, 0, 75)
+        actionGroup.Position = UDim2.new(0, 6, 0, 44)
+        actionGroup.BackgroundTransparency = 1
+        actionGroup.Visible = false
+        actionGroup.Parent = tpContainer
 
-        local listLayout = Instance.new("UIListLayout")
-        listLayout.Padding = UDim.new(0, 6)
-        listLayout.Parent = tpListContainer
+        local coordLabel = Instance.new("TextLabel")
+        coordLabel.Size = UDim2.new(1, 0, 0, 22)
+        coordLabel.Position = UDim2.new(0, 0, 0, 0)
+        coordLabel.BackgroundTransparency = 1
+        coordLabel.Text = "<b>Coords: <font color=\"#00E5FF\">X: 0.0, Y: 0.0, Z: 0.0</font></b>"
+        coordLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        coordLabel.Font = Enum.Font.GothamBold
+        coordLabel.TextSize = 11
+        coordLabel.RichText = true
+        coordLabel.TextXAlignment = Enum.TextXAlignment.Left
+        coordLabel.Parent = actionGroup
 
-        listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            tpListContainer.Size = UDim2.new(1, 0, 0, listLayout.AbsoluteContentSize.Y)
-        end)
+        local btnRow = Instance.new("Frame")
+        btnRow.Size = UDim2.new(1, 0, 0, 42)
+        btnRow.Position = UDim2.new(0, 0, 0, 28)
+        btnRow.BackgroundTransparency = 1
+        btnRow.Parent = actionGroup
 
-        setBtn.MouseButton1Click:Connect(function()
+        local rowLayout = Instance.new("UIListLayout")
+        rowLayout.FillDirection = Enum.FillDirection.Horizontal
+        rowLayout.Padding = UDim.new(0, 6)
+        rowLayout.Parent = btnRow
+
+        local tpInstantBtn = Instance.new("TextButton")
+        tpInstantBtn.Size = UDim2.new(0.31, 0, 1, 0)
+        tpInstantBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
+        tpInstantBtn.Text = "<b>TP</b>"
+        tpInstantBtn.TextColor3 = Color3.fromRGB(0, 229, 255)
+        tpInstantBtn.Font = Enum.Font.GothamBold
+        tpInstantBtn.TextSize = 11
+        tpInstantBtn.RichText = true
+        tpInstantBtn.Parent = btnRow
+        Instance.new("UICorner", tpInstantBtn).CornerRadius = UDim.new(0, 6)
+
+        local walkBtn = Instance.new("TextButton")
+        walkBtn.Size = UDim2.new(0.32, 0, 1, 0)
+        walkBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
+        walkBtn.Text = "<b>WALK</b>"
+        walkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        walkBtn.Font = Enum.Font.GothamBold
+        walkBtn.TextSize = 11
+        walkBtn.RichText = true
+        walkBtn.Parent = btnRow
+        Instance.new("UICorner", walkBtn).CornerRadius = UDim.new(0, 6)
+
+        local tweenBtn = Instance.new("TextButton")
+        tweenBtn.Size = UDim2.new(0.32, 0, 1, 0)
+        tweenBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
+        tweenBtn.Text = "<b>TWEEN</b>"
+        tweenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tweenBtn.Font = Enum.Font.GothamBold
+        tweenBtn.TextSize = 11
+        tweenBtn.RichText = true
+        tweenBtn.Parent = btnRow
+        Instance.new("UICorner", tweenBtn).CornerRadius = UDim.new(0, 6)
+
+        setTpBtn.MouseButton1Click:Connect(function()
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             if hrp then
-                local savedCFrame = hrp.CFrame
+                Config.SavedCFrame = hrp.CFrame
                 local pos = hrp.Position
 
-                local slotFrame = Instance.new("Frame")
-                slotFrame.Size = UDim2.new(1, -4, 0, 44)
-                slotFrame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
-                slotFrame.Parent = tpListContainer
-                Instance.new("UICorner", slotFrame).CornerRadius = UDim.new(0, 6)
+                coordLabel.Text = string.format("<b>Coords: <font color=\"#00E5FF\">X:%.1f, Y:%.1f, Z:%.1f</font></b>", pos.X, pos.Y, pos.Z)
+                TweenService:Create(tpContainer, TweenInfo.new(0.2), {Size = UDim2.new(1, -4, 0, 125)}):Play()
+                actionGroup.Visible = true
 
-                local tpBtn = Instance.new("TextButton")
-                tpBtn.Size = UDim2.new(1, -45, 1, 0)
-                tpBtn.Position = UDim2.new(0, 5, 0, 0)
-                tpBtn.BackgroundTransparency = 1
-                tpBtn.Text = string.format("<b>TP <font color=\"#00E5FF\">[ X:%.1f, Y:%.1f, Z:%.1f ]</font></b>", pos.X, pos.Y, pos.Z)
-                tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                tpBtn.Font = Enum.Font.GothamBold
-                tpBtn.TextSize = 11
-                tpBtn.RichText = true
-                tpBtn.TextXAlignment = Enum.TextXAlignment.Left
-                tpBtn.Parent = slotFrame
+                setTpBtn.Text = "<b>LOCATION SAVED!</b>"
+                task.wait(0.8)
+                setTpBtn.Text = "<b>SET TP LOCATION</b>"
+            end
+        end)
 
-                local delBtn = Instance.new("TextButton")
-                delBtn.Size = UDim2.fromOffset(30, 30)
-                delBtn.Position = UDim2.new(1, -35, 0.5, -15)
-                delBtn.BackgroundColor3 = Color3.fromRGB(220, 35, 70)
-                delBtn.Text = "<b>X</b>"
-                delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                delBtn.Font = Enum.Font.GothamBold
-                delBtn.TextSize = 12
-                delBtn.RichText = true
-                delBtn.Parent = slotFrame
-                Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 4)
+        tpInstantBtn.MouseButton1Click:Connect(function()
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp and Config.SavedCFrame then
+                hrp.CFrame = Config.SavedCFrame
+            end
+        end)
 
-                tpBtn.MouseButton1Click:Connect(function()
-                    local c = LocalPlayer.Character
-                    local h = c and c:FindFirstChild("HumanoidRootPart")
-                    if h then h.CFrame = savedCFrame end
-                end)
+        walkBtn.MouseButton1Click:Connect(function()
+            if Config.SavedCFrame then
+                WalkToPosition(Config.SavedCFrame.Position)
+            end
+        end)
 
-                delBtn.MouseButton1Click:Connect(function()
-                    slotFrame:Destroy()
-                end)
+        tweenBtn.MouseButton1Click:Connect(function()
+            if Config.SavedCFrame then
+                TweenToCFrame(Config.SavedCFrame)
             end
         end)
     end
 
-    -- Assign UI Elements to specific Tabs
-    SetupDynamicTeleportSystem()
+    -- Tab Navigation Structure
+    local TabBar = Instance.new("Frame")
+    TabBar.Size = UDim2.new(1, -12, 0, 32)
+    TabBar.Position = UDim2.new(0, 6, 0, 44)
+    TabBar.BackgroundTransparency = 1
+    TabBar.Parent = MainFrame
 
-    CreateToggle(PlayerTab, "Enable WalkSpeed", function(state)
+    local TabLayout = Instance.new("UIListLayout")
+    TabLayout.FillDirection = Enum.FillDirection.Horizontal
+    TabLayout.Padding = UDim.new(0, 4)
+    TabLayout.Parent = TabBar
+
+    local TabFrames = {}
+    local function CreateTab(tabName)
+        local tabBtn = Instance.new("TextButton")
+        tabBtn.Size = UDim2.new(0.5, -2, 1, 0)
+        tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
+        tabBtn.Text = "<b>" .. tabName .. "</b>"
+        tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
+        tabBtn.Font = Enum.Font.GothamBold
+        tabBtn.TextSize = 11
+        tabBtn.RichText = true
+        tabBtn.Parent = TabBar
+        Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
+
+        local container = Instance.new("ScrollingFrame")
+        container.Size = UDim2.new(1, -12, 1, -86)
+        container.Position = UDim2.new(0, 6, 0, 80)
+        container.BackgroundTransparency = 1
+        container.ScrollBarThickness = 3
+        container.ScrollBarImageColor3 = Color3.fromRGB(0, 210, 255)
+        container.Visible = false
+        container.Parent = MainFrame
+
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Padding = UDim.new(0, 6)
+        listLayout.Parent = container
+
+        listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            container.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 12)
+        end)
+
+        TabFrames[tabName] = { Button = tabBtn, Container = container }
+
+        tabBtn.MouseButton1Click:Connect(function()
+            for _, data in pairs(TabFrames) do
+                data.Container.Visible = false
+                data.Button.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
+                data.Button.TextColor3 = Color3.fromRGB(180, 180, 210)
+            end
+            container.Visible = true
+            tabBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
+            tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end)
+
+        return container
+    end
+
+    local NavigationTab = CreateTab("Navigation & TP")
+    local VisualsTab    = CreateTab("Visuals & Speed")
+
+    TabFrames["Navigation & TP"].Container.Visible = true
+    TabFrames["Navigation & TP"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
+    TabFrames["Navigation & TP"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    -- Populate Navigation Tab
+    SetupNavigationComponent(NavigationTab)
+
+    CreateToggle(NavigationTab, "Enable WalkSpeed Override", function(state)
         Config.SpeedEnabled = state
         if not state and LocalPlayer.Character then
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = 16 end
         end
     end)
-    CreateSlider(PlayerTab, "Player Speed", 16, 300, Config.WalkSpeed, function(val) Config.WalkSpeed = val end)
+    CreateSlider(NavigationTab, "WalkSpeed Value", 16, 300, Config.WalkSpeed, function(val) Config.WalkSpeed = val end)
 
-    CreateToggle(PlayerTab, "Enable Fly", function(state)
+    -- Populate Visuals Tab
+    CreateToggle(VisualsTab, "Enable Fly", function(state)
         Config.FlyEnabled = state
         if state then EnableFly() else DisableFly() end
     end)
-    CreateSlider(PlayerTab, "Fly Speed", 10, 300, Config.FlySpeed, function(val) Config.FlySpeed = val end)
-
-    CreateToggle(PlayerTab, "Noclip", function(state) Config.Noclip = state end)
-    
+    CreateSlider(VisualsTab, "Fly Speed", 10, 300, Config.FlySpeed, function(val) Config.FlySpeed = val end)
+    CreateToggle(VisualsTab, "Noclip", function(state) Config.Noclip = state end)
     CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
 end
 
--- Detection Logic
+-- ============================================================
+-- GAME ROUTER EXECUTION
+-- ============================================================
 local nameLower = gameName:lower()
 
 if nameLower:find("taxi boss") or PlaceId == 7305826609 then
@@ -1565,6 +1705,6 @@ elseif nameLower:find("keyboard escape") or nameLower:find("+1 speed") then
     print("[BRINELAND] Detected +1 Speed Keyboard Escape. Executing script...")
     RunKeyboardEscape()
 else
-    print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Script...")
+    print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
 end
