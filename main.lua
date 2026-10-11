@@ -3,13 +3,15 @@
     BRINELAND MASTER MULTI-GAME HUB
     Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
     
-    Includes:
+    Modules:
       - Game Router (Taxi Boss, Steal An Egg, +1 Speed Keyboard Escape)
-      - Universal Fallback Hub featuring:
-        * Dynamic Set TP System with Coordinates Readout
-        * Individual TP, WALK (Pathfinding), TWEEN, and DELETE (X) per slot
-        * Player Cheats Section with Numberless Gravity Bar
-        * WalkSpeed, Fly, Noclip, and Player ESP
+      - Universal Fallback Hub:
+        * Dynamic Set TP System with Coordinate Readout
+        * Action Buttons: TP, WALK (Pathfinding), TWEEN, DELETE (X)
+        * Close-Range Auto Aim (Target Lock using CFrame.lookAt)
+        * Improved Player ESP (Highlight + Live Billboard with HP & Distance)
+        * Numberless Gravity Slider Bar
+        * WalkSpeed, Fly, Noclip Controls
     ============================================================
 ]]
 
@@ -1068,10 +1070,39 @@ local function RunUniversalScript()
         FlySpeed     = 50,
         Noclip       = false,
         PlayerESP    = false,
+        AutoAim      = false,
+        AutoAimRange = 60,
         Gravity      = 196.2,
         TweenSpeed   = 80,
         SavedCFrames = {}
     }
+
+    -- Target Lock Auto Aim Helper
+    local function GetNearestEnemyTarget(maxRange)
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return nil end
+
+        local closestPart = nil
+        local shortestDist = maxRange or math.huge
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local targetHrp = player.Character:FindFirstChild("HumanoidRootPart")
+                local targetHead = player.Character:FindFirstChild("Head")
+                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+
+                if targetHrp and hum and hum.Health > 0 then
+                    local dist = (targetHrp.Position - hrp.Position).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        closestPart = targetHead or targetHrp
+                    end
+                end
+            end
+        end
+        return closestPart
+    end
 
     -- Fly Engine
     local flyVelocity, flyGyro
@@ -1204,19 +1235,42 @@ local function RunUniversalScript()
                 flyGyro.CFrame = cam.CFrame
             end
         end
+
+        -- Close Range Auto Aim Lock
+        if Config.AutoAim then
+            local target = GetNearestEnemyTarget(Config.AutoAimRange)
+            local cam = Workspace.CurrentCamera
+            if target and cam then
+                cam.CFrame = CFrame.lookAt(cam.CFrame.Position, target.Position)
+            end
+        end
     end)
 
-    -- ESP Engine
-    local espStorage = {}
-    local function ApplyESP(player)
+    -- Improved ESP Engine
+    local ESPStorage = {}
+
+    local function RemovePlayerESP(player)
+        if ESPStorage[player] then
+            if ESPStorage[player].Connection then ESPStorage[player].Connection:Disconnect() end
+            if ESPStorage[player].Highlight then ESPStorage[player].Highlight:Destroy() end
+            if ESPStorage[player].Billboard then ESPStorage[player].Billboard:Destroy() end
+            ESPStorage[player] = nil
+        end
+    end
+
+    local function CreatePlayerESP(player)
         if player == LocalPlayer then return end
 
-        local function CreateHighlight(char)
+        local function CharacterAdded(char)
+            RemovePlayerESP(player)
             if not char then return end
-            if espStorage[player] then espStorage[player]:Destroy() end
+
+            local hrp = char:WaitForChild("HumanoidRootPart", 5)
+            local hum = char:WaitForChild("Humanoid", 5)
+            if not hrp or not hum then return end
 
             local highlight = Instance.new("Highlight")
-            highlight.Name = "BrinelandESPHighlight"
+            highlight.Name = "ESP_Highlight"
             highlight.FillColor = Color3.fromRGB(0, 229, 255)
             highlight.OutlineColor = Color3.fromRGB(150, 85, 255)
             highlight.FillTransparency = 0.5
@@ -1225,26 +1279,72 @@ local function RunUniversalScript()
             highlight.Enabled = Config.PlayerESP
             highlight.Parent = char
 
-            espStorage[player] = highlight
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "ESP_Billboard"
+            billboard.Adornee = hrp
+            billboard.Size = UDim2.fromOffset(160, 40)
+            billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+            billboard.AlwaysOnTop = true
+
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = "<b>" .. player.DisplayName .. " (@" .. player.Name .. ")</b>"
+            nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.TextSize = 11
+            nameLabel.RichText = true
+            nameLabel.Parent = billboard
+
+            local infoLabel = Instance.new("TextLabel")
+            infoLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            infoLabel.Position = UDim2.new(0, 0, 0.5, 0)
+            infoLabel.BackgroundTransparency = 1
+            infoLabel.TextColor3 = Color3.fromRGB(0, 229, 255)
+            infoLabel.Font = Enum.Font.Gotham
+            infoLabel.TextSize = 10
+            infoLabel.RichText = true
+            infoLabel.Parent = billboard
+
+            billboard.Parent = hrp
+
+            local updateConn
+            updateConn = RunService.Heartbeat:Connect(function()
+                if not char.Parent or not hum or hum.Health <= 0 or not Config.PlayerESP then
+                    billboard.Enabled = false
+                    highlight.Enabled = false
+                    return
+                end
+
+                local myChar = LocalPlayer.Character
+                local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                local dist = myHrp and math.floor((hrp.Position - myHrp.Position).Magnitude) or 0
+
+                billboard.Enabled = true
+                highlight.Enabled = true
+                infoLabel.Text = string.format("<b>HP: %d/%d | Dist: %dm</b>", math.floor(hum.Health), math.floor(hum.MaxHealth), dist)
+            end)
+
+            ESPStorage[player] = {
+                Highlight = highlight,
+                Billboard = billboard,
+                Connection = updateConn
+            }
         end
 
-        if player.Character then CreateHighlight(player.Character) end
-        player.CharacterAdded:Connect(CreateHighlight)
+        if player.Character then CharacterAdded(player.Character) end
+        player.CharacterAdded:Connect(CharacterAdded)
     end
 
-    for _, player in ipairs(Players:GetPlayers()) do ApplyESP(player) end
-    Players.PlayerAdded:Connect(ApplyESP)
-    Players.PlayerRemoving:Connect(function(player)
-        if espStorage[player] then
-            espStorage[player]:Destroy()
-            espStorage[player] = nil
-        end
-    end)
+    for _, p in ipairs(Players:GetPlayers()) do CreatePlayerESP(p) end
+    Players.PlayerAdded:Connect(CreatePlayerESP)
+    Players.PlayerRemoving:Connect(RemovePlayerESP)
 
     local function ToggleESPState(state)
         Config.PlayerESP = state
-        for _, highlight in pairs(espStorage) do
-            if highlight then highlight.Enabled = state end
+        for _, data in pairs(ESPStorage) do
+            if data.Highlight then data.Highlight.Enabled = state end
+            if data.Billboard then data.Billboard.Enabled = state end
         end
     end
 
@@ -1387,7 +1487,7 @@ local function RunUniversalScript()
     TabFrames["Teleports"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
     TabFrames["Teleports"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-    -- Minimize Controller
+    -- Window Controls
     local isMinimized = false
     MinimizeBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
@@ -1541,7 +1641,7 @@ local function RunUniversalScript()
         end)
     end
 
-    -- DYNAMIC TELEPORT SYSTEM (Exact Sketch Implementation)
+    -- DYNAMIC TELEPORT SYSTEM
     local function SetupDynamicTeleportSystem(parentContainer)
         local setBtnFrame = Instance.new("Frame")
         setBtnFrame.Size = UDim2.new(1, -4, 0, 44)
@@ -1579,7 +1679,6 @@ local function RunUniversalScript()
                 local savedCFrame = hrp.CFrame
                 local pos = hrp.Position
 
-                -- Action Frame Container as drawn in the sketch
                 local slotFrame = Instance.new("Frame")
                 slotFrame.Size = UDim2.new(1, -4, 0, 75)
                 slotFrame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
@@ -1610,7 +1709,6 @@ local function RunUniversalScript()
                 delBtn.Parent = slotFrame
                 Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 4)
 
-                -- Button Group Row
                 local btnRow = Instance.new("Frame")
                 btnRow.Size = UDim2.new(1, -20, 0, 38)
                 btnRow.Position = UDim2.new(0, 10, 0, 30)
@@ -1655,7 +1753,6 @@ local function RunUniversalScript()
                 tweenBtn.Parent = btnRow
                 Instance.new("UICorner", tweenBtn).CornerRadius = UDim.new(0, 6)
 
-                -- Event Bindings
                 tpInstantBtn.MouseButton1Click:Connect(function()
                     local c = LocalPlayer.Character
                     local h = c and c:FindFirstChild("HumanoidRootPart")
@@ -1684,19 +1781,27 @@ local function RunUniversalScript()
     -- Populate Tabs
     SetupDynamicTeleportSystem(TeleportsTab)
 
-    -- Numberless Gravity Slider Bar in Player Cheats Tab
+    -- Numberless Gravity Slider
     CreateSlider(PlayerTab, "Gravity (Moon <-> Heavy)", 10, 500, workspace.Gravity, false, function(val)
         workspace.Gravity = val
     end)
 
-    CreateToggle(PlayerTab, "Enable WalkSpeed Override", function(state)
+    -- Close-Range Auto Aim
+    CreateToggle(PlayerTab, "Enable Auto Aim (Lock)", function(state)
+        Config.AutoAim = state
+    end)
+    CreateSlider(PlayerTab, "Auto Aim Lock Range", 10, 200, Config.AutoAimRange, true, function(val)
+        Config.AutoAimRange = val
+    end)
+
+    CreateToggle(PlayerTab, "Enable WalkSpeed", function(state)
         Config.SpeedEnabled = state
         if not state and LocalPlayer.Character then
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = 16 end
         end
     end)
-    CreateSlider(PlayerTab, "WalkSpeed Value", 16, 300, Config.WalkSpeed, true, function(val) Config.WalkSpeed = val end)
+    CreateSlider(PlayerTab, "Player Speed", 16, 300, Config.WalkSpeed, true, function(val) Config.WalkSpeed = val end)
 
     CreateToggle(PlayerTab, "Enable Fly", function(state)
         Config.FlyEnabled = state
@@ -1708,9 +1813,7 @@ local function RunUniversalScript()
     CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
 end
 
--- ============================================================
--- GAME ROUTER EXECUTION
--- ============================================================
+-- Game Router Execution
 local nameLower = gameName:lower()
 
 if nameLower:find("taxi boss") or PlaceId == 7305826609 then
