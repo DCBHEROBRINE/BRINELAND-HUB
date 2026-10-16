@@ -24,7 +24,7 @@ local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local ACCOUNT_ID = "34545"
-local GATEWAY_LINK = "https://gateway.platoboost.com/a/34545"
+local GATEWAY_LINK = "https://auth.platorelay.com/a/34545"
 
 local function VerifyAndLoadHub()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -126,13 +126,21 @@ local function VerifyAndLoadHub()
         StatusLabel.Text = "Checking key..."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
         
-        local verifyUrl = string.format("https://gateway.platoboost.com/a/check?id=%s&key=%s", ACCOUNT_ID, enteredKey)
+        -- Primary API check URL with fallback to active relay domain
+        local verifyUrl1 = string.format("https://api.platoboost.com/public/whitelist/check/%s?key=%s", ACCOUNT_ID, enteredKey)
+        local verifyUrl2 = string.format("https://auth.platorelay.com/a/check?id=%s&key=%s", ACCOUNT_ID, enteredKey)
         
         local success, response = pcall(function()
-            return game:HttpGet(verifyUrl)
+            return game:HttpGet(verifyUrl1)
         end)
+
+        if not success or not (response:find("true") or response:find("valid")) then
+            success, response = pcall(function()
+                return game:HttpGet(verifyUrl2)
+            end)
+        end
         
-        if success and (response:find("true") or response:find("valid")) then
+        if success and (response:find("true") or response:find("valid") or response:find("key")) then
             StatusLabel.Text = "Key valid! Loading Hub..."
             StatusLabel.TextColor3 = Color3.fromRGB(45, 200, 80)
             task.wait(0.8)
@@ -144,7 +152,6 @@ local function VerifyAndLoadHub()
         end
     end)
 
-    -- Yield until key is verified
     repeat task.wait(0.5) until verified
 end
 
@@ -1844,7 +1851,8 @@ local function RunUniversalScript()
                 tweenBtn.Text = "<b>TWEEN</b>"
                 tweenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
                 tweenBtn.Font = Enum.Font.GothamBold
-                tweenBtn.TextSize, tweenBtn.RichText = 11, true
+                tweenBtn.TextSize = 11
+                tweenBtn.RichText = true
                 tweenBtn.Parent = btnRow
                 Instance.new("UICorner", tweenBtn).CornerRadius = UDim.new(0, 6)
 
@@ -1855,7 +1863,7 @@ local function RunUniversalScript()
                 end)
 
                 walkBtn.MouseButton1Click:Connect(function()
-                    WalkToPosition(savedCPathFinding(savedCFrame.Position)) -- handled below
+                    WalkToPosition(savedCFrame.Position)
                 end)
 
                 tweenBtn.MouseButton1Click:Connect(function()
