@@ -192,7 +192,6 @@ local LocalPlayer = Players.LocalPlayer
 local KEY_FILE_NAME = "BrineKey.txt"
 
 local function VerifyAndLoadHub()
-    -- Check for saved key on device first (Auto-Login)
     if readfile and isfile and isfile(KEY_FILE_NAME) then
         local savedKey = readfile(KEY_FILE_NAME)
         if savedKey and savedKey ~= "" then
@@ -472,24 +471,9 @@ local function RunTaxiBoss()
 
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
-    local Gradient = Instance.new("UIGradient")
-    Gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(55, 20, 95)),
-        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(25, 35, 115)),
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(15, 65, 145))
-    })
-    Gradient.Rotation = 45
-    Gradient.Parent = MainFrame
-
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(150, 85, 255)
-    Stroke.Thickness = 1.5
-    Stroke.Parent = MainFrame
-
     local TopBar = Instance.new("Frame")
     TopBar.Size = UDim2.new(1, 0, 0, 40)
     TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
-    TopBar.BackgroundTransparency = 0.3
     TopBar.Parent = MainFrame
     Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 10)
 
@@ -505,17 +489,214 @@ local function RunTaxiBoss()
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TopBar
 
-    local MinimizeBtn = Instance.new("TextButton")
-    MinimizeBtn.Size = UDim2.fromOffset(28, 28)
-    MinimizeBtn.Position = UDim2.new(1, -64, 0.5, -14)
-    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(45, 40, 80)
-    MinimizeBtn.Text = "<b>–</b>"
-    MinimizeBtn.TextColor3 = Color3.fromRGB(0, 229, 255)
-    MinimizeBtn.Font = Enum.Font.GothamBold
-    MinimizeBtn.TextSize = 16
-    MinimizeBtn.RichText = true
-    MinimizeBtn.Parent = TopBar
-    Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.fromOffset(28, 28)
+    CloseBtn.Position = UDim2.new(1, -32, 0.5, -14)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 35, 70)
+    CloseBtn.Text = "<b>X</b>"
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 13
+    CloseBtn.RichText = true
+    CloseBtn.Parent = TopBar
+    CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+end
+
+-- ============================================================
+-- SCRIPT 2: STEAL AN EGG HUB
+-- ============================================================
+local function RunStealAnEgg()
+    local TweenService     = game:GetService("TweenService")
+    local UserInputService = game:GetService("UserInputService")
+    local Workspace        = game:GetService("Workspace")
+    local RunService       = game:GetService("RunService")
+
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    if PlayerGui:FindFirstChild("StealAnEggHubV7") then
+        PlayerGui.StealAnEggHubV7:Destroy()
+    end
+
+    local Config = { AutoSteal = false, TweenSpeed = 80 }
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "StealAnEggHubV7"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = PlayerGui
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.fromOffset(360, 430)
+    MainFrame.Position = UDim2.new(0.5, -180, 0.5, -215)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(14, 12, 26)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Parent = ScreenGui
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+    local TopBar = Instance.new("Frame")
+    TopBar.Size = UDim2.new(1, 0, 0, 40)
+    TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
+    TopBar.Parent = MainFrame
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, -70, 1, 0)
+    Title.Position = UDim2.new(0, 12, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">STEAL AN EGG</font>"
+    Title.TextColor3 = Color3.fromRGB(0, 225, 255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 13
+    Title.RichText = true
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = TopBar
+
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.fromOffset(26, 26)
+    CloseBtn.Position = UDim2.new(1, -32, 0.5, -13)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(225, 35, 75)
+    CloseBtn.Text = "<b>X</b>"
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 13
+    CloseBtn.RichText = true
+    CloseBtn.Parent = TopBar
+    CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+end
+
+-- ============================================================
+-- SCRIPT 3: KEYBOARD ESCAPE
+-- ============================================================
+local function RunKeyboardEscape()
+    if _G.BrinelandScriptLoaded then return end
+    _G.BrinelandScriptLoaded = true
+
+    local unlockPacks = {"Premium", "Water", "Bubble", "Christmas", "Lava", "Honey", "Snow", "Slime"}
+    for _, packName in ipairs(unlockPacks) do
+        LocalPlayer:SetAttribute("Sound_" .. packName, true)
+        LocalPlayer:SetAttribute("Owns_" .. packName, true)
+        LocalPlayer:SetAttribute("Anim_" .. packName, true)
+    end
+end
+
+-- ============================================================
+-- SCRIPT 4: FULL UNIVERSAL HUB (FOR NOTORIETY & UNKNOWN GAMES)
+-- ============================================================
+local function RunUniversalScript()
+    local TweenService     = game:GetService("TweenService")
+    local UserInputService = game:GetService("UserInputService")
+    local Workspace        = game:GetService("Workspace")
+    local RunService       = game:GetService("RunService")
+
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    if PlayerGui:FindFirstChild("BrinelandUniversalHub") then
+        PlayerGui.BrinelandUniversalHub:Destroy()
+    end
+
+    local Config = {
+        WalkSpeed    = 16,
+        SpeedEnabled = false,
+        FlyEnabled   = false,
+        FlySpeed     = 50,
+        Noclip       = false,
+        PlayerESP    = false,
+        AutoAim      = false,
+        AutoAimRange = 60
+    }
+
+    local flyVelocity, flyGyro
+
+    local function EnableFly()
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+
+        flyVelocity = Instance.new("BodyVelocity")
+        flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        flyVelocity.Velocity = Vector3.zero
+        flyVelocity.Parent = hrp
+
+        flyGyro = Instance.new("BodyGyro")
+        flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+        flyGyro.CFrame = hrp.CFrame
+        flyGyro.Parent = hrp
+
+        hum.PlatformStand = true
+    end
+
+    local function DisableFly()
+        if flyVelocity then flyVelocity:Destroy(); flyVelocity = nil end
+        if flyGyro then flyGyro:Destroy(); flyGyro = nil end
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.PlatformStand = false end
+        end
+    end
+
+    RunService.Stepped:Connect(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        if Config.SpeedEnabled then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = Config.WalkSpeed end
+        end
+        if Config.Noclip then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
+            end
+        end
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        if Config.FlyEnabled and LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hrp and hum and flyVelocity and flyGyro then
+                local cam = Workspace.CurrentCamera
+                local moveDir = hum.MoveDirection
+                local velocity = Vector3.zero
+                if moveDir.Magnitude > 0 then
+                    velocity = (cam.CFrame.Rotation * moveDir).Unit * Config.FlySpeed
+                end
+                flyVelocity.Velocity = velocity
+                flyGyro.CFrame = cam.CFrame
+            end
+        end
+    end)
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "BrinelandUniversalHub"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = PlayerGui
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.fromOffset(350, 420)
+    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -210)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.ClipsDescendants = true
+    MainFrame.Parent = ScreenGui
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+    local TopBar = Instance.new("Frame")
+    TopBar.Size = UDim2.new(1, 0, 0, 40)
+    TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
+    TopBar.Parent = MainFrame
+    Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 10)
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, -40, 1, 0)
+    Title.Position = UDim2.new(0, 10, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">UNIVERSAL HUB</font>"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 13
+    Title.RichText = true
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = TopBar
 
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Size = UDim2.fromOffset(28, 28)
@@ -540,35 +721,6 @@ local function RunTaxiBoss()
     local Layout = Instance.new("UIListLayout")
     Layout.Padding = UDim.new(0, 6)
     Layout.Parent = Container
-
-    local isMinimized = false
-    MinimizeBtn.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
-        if isMinimized then
-            Container.Visible = false
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(340, 40)}):Play()
-            MinimizeBtn.Text = "<b>+</b>"
-        else
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(340, 320)}):Play()
-            task.wait(0.15)
-            Container.Visible = true
-            MinimizeBtn.Text = "<b>–</b>"
-        end
-    end)
-
-    local dragging, dragStart, startPos
-    TopBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function() dragging = false end)
 
     local function CreateToggle(text, callback)
         local frame = Instance.new("Frame")
@@ -618,18 +770,18 @@ local function RunTaxiBoss()
         end)
     end
 
-    local function CreateInput(text, defaultVal, callback)
+    local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -4, 0, 40)
+        frame.Size = UDim2.new(1, -4, 0, 48)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
         frame.Parent = Container
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
         local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(0.65, 0, 1, 0)
-        lbl.Position = UDim2.new(0, 10, 0, 0)
+        lbl.Size = UDim2.new(1, -20, 0, 20)
+        lbl.Position = UDim2.new(0, 10, 0, 4)
         lbl.BackgroundTransparency = 1
-        lbl.Text = "<b>" .. text .. "</b>"
+        lbl.Text = "<b>" .. text .. ": <font color=\"#00E5FF\">" .. tostring(defaultVal) .. "</font></b>"
         lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
         lbl.Font = Enum.Font.GothamBold
         lbl.TextSize = 11
@@ -637,416 +789,56 @@ local function RunTaxiBoss()
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.Parent = frame
 
-        local textBox = Instance.new("TextBox")
-        textBox.Size = UDim2.fromOffset(65, 24)
-        textBox.Position = UDim2.new(1, -72, 0.5, -12)
-        textBox.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
-        textBox.Text = tostring(defaultVal)
-        textBox.TextColor3 = Color3.fromRGB(0, 229, 255)
-        textBox.Font = Enum.Font.GothamBold
-        textBox.TextSize = 11
-        textBox.Parent = frame
-        Instance.new("UICorner", textBox).CornerRadius = UDim.new(0, 4)
+        local track = Instance.new("Frame")
+        track.Size = UDim2.new(1, -20, 0, 8)
+        track.Position = UDim2.new(0, 10, 0, 28)
+        track.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
+        track.Parent = frame
+        Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
-        textBox.FocusLost:Connect(function()
-            local n = tonumber(textBox.Text)
-            if n then callback(n) end
+        local fill = Instance.new("Frame")
+        local startPct = math.clamp((defaultVal - minVal) / (maxVal - minVal), 0, 1)
+        fill.Size = UDim2.new(startPct, 0, 1, 0)
+        fill.BackgroundColor3 = Color3.fromRGB(0, 229, 255)
+        fill.Parent = track
+        Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+        local sliding = false
+        local function UpdateValue(input)
+            local pos = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+            fill.Size = UDim2.new(pos, 0, 1, 0)
+            local val = math.floor(minVal + (maxVal - minVal) * pos)
+            lbl.Text = "<b>" .. text .. ": <font color=\"#00E5FF\">" .. tostring(val) .. "</font></b>"
+            callback(val)
+        end
+
+        track.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                sliding = true; UpdateValue(input)
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                UpdateValue(input)
+            end
+        end)
+
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                sliding = false
+            end
         end)
     end
 
-    CreateToggle("collect part", function(state) Config.AutoCollectItems = state end)
-    CreateToggle("clear ai car", function(state) Config.ClearAICars = state end)
-    CreateToggle("car boost", function(state) Config.EnableCarSpeed = state end)
-    CreateInput("Target Speed (KM/H)", Config.TargetKMH, function(val) Config.TargetKMH = val end)
-    CreateInput("Player WalkSpeed", Config.PlayerSpeed, function(val) Config.PlayerSpeed = val end)
-end
-
--- ============================================================
--- SCRIPT 2: STEAL AN EGG HUB
--- ============================================================
-local function RunStealAnEgg()
-    local TweenService     = game:GetService("TweenService")
-    local UserInputService = game:GetService("UserInputService")
-    local Workspace        = game:GetService("Workspace")
-    local RunService       = game:GetService("RunService")
-
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    if PlayerGui:FindFirstChild("StealAnEggHubV7") then
-        PlayerGui.StealAnEggHubV7:Destroy()
-    end
-
-    local Config = {
-        AutoSteal            = false,
-        TweenSpeed           = 80,
-        EnableSpeed          = false,
-        PlayerSpeed          = 24
-    }
-
-    local function BindClick(button, callback)
-        button.Active = true
-        local lastClick = 0
-        local function trigger()
-            local now = tick()
-            if now - lastClick > 0.08 then
-                lastClick = now
-                callback()
-            end
-        end
-        button.MouseButton1Click:Connect(trigger)
-        button.Activated:Connect(trigger)
-    end
-
-    local function GetMyPlot()
-        local plots = Workspace:FindFirstChild("Plots")
-        if not plots then return nil end
-
-        for _, plot in ipairs(plots:GetChildren()) do
-            local owner = plot:FindFirstChild("Owner") or plot:FindFirstChild("OwnerValue") or plot:FindFirstChild("Player")
-            if owner and (owner.Value == LocalPlayer or owner.Value == LocalPlayer.Name) then
-                return plot
-            end
-        end
-        return plots:FindFirstChild("1") or plots:GetChildren()[1]
-    end
-
-    local function GetSafeZoneCFrame()
-        local myPlot = GetMyPlot()
-        if myPlot then
-            local treadmill = myPlot:FindFirstChild("TreadmillUpgrade") or myPlot:FindFirstChild("Treadmill")
-            if treadmill then
-                local base = treadmill:FindFirstChildWhichIsA("BasePart", true)
-                if base then return base.CFrame + Vector3.new(0, 4, 0) end
-            end
-        end
-        local char = LocalPlayer.Character
-        return char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame or CFrame.new(0, 10, 0)
-    end
-
-    local function TouchPart(part)
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp and part and part:IsA("BasePart") then
-            pcall(function()
-                if firetouchinterest then
-                    firetouchinterest(hrp, part, 0)
-                    task.wait(0.02)
-                    firetouchinterest(hrp, part, 1)
-                end
-            end)
-        end
-    end
-
-    local function MoveToTarget(targetCFrame)
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        local distance = (hrp.Position - targetCFrame.Position).Magnitude
-        if distance < 3 then return end
-
-        local duration = math.max(0.05, distance / math.max(10, Config.TweenSpeed))
-        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
-        tween:Play()
-        tween.Completed:Wait()
-    end
-
-    local function GetEggTargets()
-        local targets = {}
-        local areaSlots = Workspace:FindFirstChild("AreaEggSlotsClient")
-        if areaSlots then
-            for _, model in ipairs(areaSlots:GetChildren()) do
-                local hitbox = model:FindFirstChild("Hitbox") or model:FindFirstChildWhichIsA("BasePart", true)
-                if hitbox then table.insert(targets, {Part = hitbox, Model = model}) end
-            end
-        end
-        return targets
-    end
-
-    RunService.Stepped:Connect(function()
-        for _, prompt in ipairs(Workspace:GetDescendants()) do
-            if prompt:IsA("ProximityPrompt") then prompt.HoldDuration = 0 end
-        end
-        if Config.EnableSpeed then
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.WalkSpeed = Config.PlayerSpeed end
-        end
+    CreateToggle("Enable Speed Boost", function(state) Config.SpeedEnabled = state end)
+    CreateSlider("Player Speed", 16, 300, Config.WalkSpeed, function(val) Config.WalkSpeed = val end)
+    CreateToggle("Enable Fly", function(state)
+        Config.FlyEnabled = state
+        if state then EnableFly() else DisableFly() end
     end)
-
-    task.spawn(function()
-        while true do
-            task.wait(0.1)
-            if Config.AutoSteal then
-                local targets = GetEggTargets()
-                for _, target in ipairs(targets) do
-                    if not Config.AutoSteal then break end
-                    local hitboxPart = target.Part
-                    if hitboxPart and hitboxPart.Parent then
-                        MoveToTarget(hitboxPart.CFrame + Vector3.new(0, 2, 0))
-                        TouchPart(hitboxPart)
-                        local prompt = target.Model:FindFirstChildWhichIsA("ProximityPrompt", true) or hitboxPart:FindFirstChildWhichIsA("ProximityPrompt")
-                        if prompt then
-                            prompt.HoldDuration = 0
-                            pcall(function() fireproximityprompt(prompt) end)
-                        end
-                        task.wait(0.15)
-                        MoveToTarget(GetSafeZoneCFrame())
-                        task.wait(0.2)
-                    end
-                end
-            end
-        end
-    end)
-
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "StealAnEggHubV7"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.Parent = PlayerGui
-
-    local OpenToggleBtn = Instance.new("TextButton")
-    OpenToggleBtn.Size = UDim2.fromOffset(50, 50)
-    OpenToggleBtn.Position = UDim2.new(0, 15, 0.5, -25)
-    OpenToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 240)
-    OpenToggleBtn.Text = "<b>HUB</b>"
-    OpenToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    OpenToggleBtn.Font = Enum.Font.GothamBold
-    OpenToggleBtn.TextSize = 13
-    OpenToggleBtn.RichText = true
-    OpenToggleBtn.Active = true
-    OpenToggleBtn.Parent = ScreenGui
-    Instance.new("UICorner", OpenToggleBtn).CornerRadius = UDim.new(1, 0)
-
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(360, 430)
-    MainFrame.Position = UDim2.new(0.5, -180, 0.5, -215)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(14, 12, 26)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Active = true
-    MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
-    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-
-    local isGuiOpen = true
-    BindClick(OpenToggleBtn, function()
-        isGuiOpen = not isGuiOpen
-        MainFrame.Visible = isGuiOpen
-    end)
-
-    local TopBar = Instance.new("Frame")
-    TopBar.Size = UDim2.new(1, 0, 0, 40)
-    TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
-    TopBar.Parent = MainFrame
-
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -70, 1, 0)
-    Title.Position = UDim2.new(0, 12, 0, 0)
-    Title.BackgroundTransparency = 1
-    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">STEAL AN EGG</font>"
-    Title.TextColor3 = Color3.fromRGB(0, 225, 255)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 13
-    Title.RichText = true
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.Parent = TopBar
-
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.fromOffset(26, 26)
-    CloseBtn.Position = UDim2.new(1, -32, 0.5, -13)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(225, 35, 75)
-    CloseBtn.Text = "<b>X</b>"
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 13
-    CloseBtn.RichText = true
-    CloseBtn.Parent = TopBar
-    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
-    BindClick(CloseBtn, function() ScreenGui:Destroy() end)
-
-    local TabBar = Instance.new("Frame")
-    TabBar.Size = UDim2.new(1, -12, 0, 32)
-    TabBar.Position = UDim2.new(0, 6, 0, 44)
-    TabBar.BackgroundTransparency = 1
-    TabBar.Parent = MainFrame
-
-    local function CreateTab(tabName)
-        local tabBtn = Instance.new("TextButton")
-        tabBtn.Size = UDim2.new(0.24, 0, 1, 0)
-        tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
-        tabBtn.Text = "<b>" .. tabName .. "</b>"
-        tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
-        tabBtn.Font = Enum.Font.GothamBold
-        tabBtn.TextSize = 10
-        tabBtn.RichText = true
-        tabBtn.Parent = TabBar
-        Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
-
-        local container = Instance.new("ScrollingFrame")
-        container.Size = UDim2.new(1, -12, 1, -86)
-        container.Position = UDim2.new(0, 6, 0, 80)
-        container.BackgroundTransparency = 1
-        container.ScrollBarThickness = 3
-        container.ScrollBarImageColor3 = Color3.fromRGB(0, 210, 255)
-        container.Visible = false
-        container.Parent = MainFrame
-
-        local listLayout = Instance.new("UIListLayout")
-        listLayout.Padding = UDim.new(0, 6)
-        listLayout.Parent = container
-
-        return container
-    end
-
-    local StealTab = CreateTab("Steal")
-    StealTab.Visible = true
-
-    local function CreateToggleUI(parent, text, configKey)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -4, 0, 38)
-        frame.BackgroundColor3 = Color3.fromRGB(22, 18, 38)
-        frame.Parent = parent
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
-
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -55, 1, 0)
-        lbl.Position = UDim2.new(0, 10, 0, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = "<b>" .. text .. "</b>"
-        lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextSize = 11
-        lbl.RichText = true
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Parent = frame
-
-        local toggleBg = Instance.new("Frame")
-        toggleBg.Size = UDim2.fromOffset(40, 20)
-        toggleBg.Position = UDim2.new(1, -46, 0.5, -10)
-        toggleBg.BackgroundColor3 = Color3.fromRGB(45, 35, 65)
-        toggleBg.Parent = frame
-        Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
-
-        local knob = Instance.new("Frame")
-        knob.Size = UDim2.fromOffset(16, 16)
-        knob.Position = UDim2.new(0, 2, 0.5, -8)
-        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        knob.Parent = toggleBg
-        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
-
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 1, 0)
-        btn.BackgroundTransparency = 1
-        btn.Text = ""
-        btn.Parent = frame
-
-        BindClick(btn, function()
-            Config[configKey] = not Config[configKey]
-            local state = Config[configKey]
-            TweenService:Create(knob, TweenInfo.new(0.18), {Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}):Play()
-            TweenService:Create(toggleBg, TweenInfo.new(0.18), {BackgroundColor3 = state and Color3.fromRGB(0, 190, 255) or Color3.fromRGB(45, 35, 65)}):Play()
-        end)
-    end
-
-    CreateToggleUI(StealTab, "Auto Steal & Safe Zone Return", "AutoSteal")
-end
-
--- ============================================================
--- SCRIPT 3: KEYBOARD ESCAPE
--- ============================================================
-local function RunKeyboardEscape()
-    if _G.BrinelandScriptLoaded then return end
-    _G.BrinelandScriptLoaded = true
-
-    local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
-    local unlockPacks = {"Premium", "Water", "Bubble", "Christmas", "Lava", "Honey", "Snow", "Slime"}
-    for _, packName in ipairs(unlockPacks) do
-        LocalPlayer:SetAttribute("Sound_" .. packName, true)
-        LocalPlayer:SetAttribute("Owns_" .. packName, true)
-        LocalPlayer:SetAttribute("Anim_" .. packName, true)
-    end
-end
-
--- ============================================================
--- SCRIPT 4: UNIVERSAL HUB FALLBACK
--- ============================================================
-local function RunUniversalScript()
-    local TweenService     = game:GetService("TweenService")
-    local UserInputService = game:GetService("UserInputService")
-    local Workspace        = game:GetService("Workspace")
-    local RunService       = game:GetService("RunService")
-
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    if PlayerGui:FindFirstChild("BrinelandUniversalHub") then
-        PlayerGui.BrinelandUniversalHub:Destroy()
-    end
-
-    local Config = {
-        WalkSpeed    = 16,
-        SpeedEnabled = false,
-        FlyEnabled   = false,
-        FlySpeed     = 50,
-        Noclip       = false,
-        PlayerESP    = false,
-        TweenSpeed   = 80
-    }
-
-    RunService.Stepped:Connect(function()
-        local char = LocalPlayer.Character
-        if not char then return end
-        if Config.SpeedEnabled then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.WalkSpeed = Config.WalkSpeed end
-        end
-        if Config.Noclip then
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
-            end
-        end
-    end)
-
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "BrinelandUniversalHub"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.Parent = PlayerGui
-
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(350, 440)
-    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -220)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Active = true
-    MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
-    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-
-    local TopBar = Instance.new("Frame")
-    TopBar.Size = UDim2.new(1, 0, 0, 40)
-    TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
-    TopBar.Parent = MainFrame
-
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -40, 1, 0)
-    Title.Position = UDim2.new(0, 10, 0, 0)
-    Title.BackgroundTransparency = 1
-    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">UNIVERSAL HUB</font>"
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 13
-    Title.RichText = true
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.Parent = TopBar
-
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.fromOffset(28, 28)
-    CloseBtn.Position = UDim2.new(1, -32, 0.5, -14)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 35, 70)
-    CloseBtn.Text = "<b>X</b>"
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 13
-    CloseBtn.RichText = true
-    CloseBtn.Parent = TopBar
-    CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+    CreateSlider("Fly Speed", 10, 300, Config.FlySpeed, function(val) Config.FlySpeed = val end)
+    CreateToggle("Noclip", function(state) Config.Noclip = state end)
 end
 
 -- ============================================================
@@ -1064,6 +856,6 @@ elseif nameLower:find("keyboard escape") or nameLower:find("+1 speed") then
     print("[BRINELAND] Detected +1 Speed Keyboard Escape. Executing script...")
     RunKeyboardEscape()
 else
-    print("[BRINELAND] Unrecognized game. Running Universal Hub...")
+    print("[BRINELAND] Unrecognized game (" .. gameName .. "). Running Universal Hub...")
     RunUniversalScript()
 end
