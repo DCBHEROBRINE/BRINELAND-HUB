@@ -29,7 +29,7 @@ local hostResponse = fRequest({
     Url = host .. "/public/connectivity",
     Method = "GET"
 });
-if hostResponse.StatusCode ~= 200 or hostResponse.StatusCode ~= 429 then
+if hostResponse.StatusCode ~= 200 and hostResponse.StatusCode ~= 429 then
     host = "https://api.platoboost.net";
 end
 
@@ -185,12 +185,23 @@ end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- PLATOBOOST KEY SYSTEM UI GATEWAY
+-- PLATOBOOST KEY SYSTEM UI GATEWAY (WITH AUTO-SAVE FILE KEY)
 -- ============================================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local KEY_FILE_NAME = "BrineKey.txt"
 
 local function VerifyAndLoadHub()
+    -- Check for saved key on device first (Auto-Login)
+    if readfile and isfile and isfile(KEY_FILE_NAME) then
+        local savedKey = readfile(KEY_FILE_NAME)
+        if savedKey and savedKey ~= "" then
+            if verifyKey(savedKey) then
+                return true
+            end
+        end
+    end
+
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     if PlayerGui:FindFirstChild("BrineKeySystem") then
         PlayerGui.BrineKeySystem:Destroy()
@@ -284,7 +295,7 @@ local function VerifyAndLoadHub()
         end
     end)
 
-    local verified = false
+    local isVerified = false
 
     SubmitBtn.MouseButton1Click:Connect(function()
         local enteredKey = KeyInput.Text
@@ -302,13 +313,17 @@ local function VerifyAndLoadHub()
         if isValid then
             StatusLabel.Text = "Key valid! Loading Hub..."
             StatusLabel.TextColor3 = Color3.fromRGB(45, 200, 80)
-            task.wait(0.8)
+            if writefile then
+                pcall(function() writefile(KEY_FILE_NAME, enteredKey) end)
+            end
+            task.wait(0.6)
             ScreenGui:Destroy()
-            verified = true
+            isVerified = true
         end
     end)
 
-    repeat task.wait(0.5) until verified
+    repeat task.wait(0.2) until isVerified
+    return true
 end
 
 -- Run Key Gate First
@@ -654,8 +669,6 @@ local function RunStealAnEgg()
     local UserInputService = game:GetService("UserInputService")
     local Workspace        = game:GetService("Workspace")
     local RunService       = game:GetService("RunService")
-    local Players          = game:GetService("Players")
-    local LocalPlayer      = Players.LocalPlayer
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     if PlayerGui:FindFirstChild("StealAnEggHubV7") then
@@ -664,15 +677,7 @@ local function RunStealAnEgg()
 
     local Config = {
         AutoSteal            = false,
-        StealMethod          = "Tween",
         TweenSpeed           = 80,
-        StealWalkSpeed       = 28,
-        AutoHit              = false,
-        HitRange             = 12,
-        AutoPlaceEgg         = false,
-        AutoHatch            = false,
-        AutoUpgradeTreadmill = false,
-        AutoUpgradePen       = false,
         EnableSpeed          = false,
         PlayerSpeed          = 24
     }
@@ -731,13 +736,6 @@ local function RunStealAnEgg()
         end
     end
 
-    local function ClickButton(button)
-        pcall(function()
-            for _, conn in ipairs(getconnections(button.MouseButton1Click)) do conn:Fire() end
-            for _, conn in ipairs(getconnections(button.Activated)) do conn:Fire() end
-        end)
-    end
-
     local function MoveToTarget(targetCFrame)
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -755,7 +753,6 @@ local function RunStealAnEgg()
 
     local function GetEggTargets()
         local targets = {}
-        local myPlot = GetMyPlot()
         local areaSlots = Workspace:FindFirstChild("AreaEggSlotsClient")
         if areaSlots then
             for _, model in ipairs(areaSlots:GetChildren()) do
@@ -872,11 +869,6 @@ local function RunStealAnEgg()
     TabBar.BackgroundTransparency = 1
     TabBar.Parent = MainFrame
 
-    local TabLayout = Instance.new("UIListLayout")
-    TabLayout.FillDirection = Enum.FillDirection.Horizontal
-    TabLayout.Padding = UDim.new(0, 4)
-    TabLayout.Parent = TabBar
-
     local function CreateTab(tabName)
         local tabBtn = Instance.new("TextButton")
         tabBtn.Size = UDim2.new(0.24, 0, 1, 0)
@@ -965,10 +957,7 @@ local function RunKeyboardEscape()
     if _G.BrinelandScriptLoaded then return end
     _G.BrinelandScriptLoaded = true
 
-    local Players     = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
     local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
-
     local unlockPacks = {"Premium", "Water", "Bubble", "Christmas", "Lava", "Honey", "Snow", "Slime"}
     for _, packName in ipairs(unlockPacks) do
         LocalPlayer:SetAttribute("Sound_" .. packName, true)
@@ -985,8 +974,6 @@ local function RunUniversalScript()
     local UserInputService = game:GetService("UserInputService")
     local Workspace        = game:GetService("Workspace")
     local RunService       = game:GetService("RunService")
-    local Players          = game:GetService("Players")
-    local LocalPlayer      = Players.LocalPlayer
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     if PlayerGui:FindFirstChild("BrinelandUniversalHub") then
