@@ -1,6 +1,7 @@
 -- ============================================================
--- BRINELAND MASTER MULTI-GAME HUB + PLATOBOOST KEY GATEWAY
+-- BRINELAND MASTER MULTI-GAME HUB + DUAL KEY SYSTEM (WORK.INK / LINKVERTISE)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
+-- Discord: https://discord.gg/epWMbuXSN5
 -- ============================================================
 
 -------------------------------------------------------------------------------
@@ -11,185 +12,35 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 -------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------
---! platoboost library
+--! custom service & key gateway configuration
 local service = 34545;  
-local secret = "8ad7b367-0fc1-442d-9c99-02298ea45d0c";  
-local useNonce = true;  
-
-local onMessage = function(message) end;
+local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5";
 
 repeat task.wait(1) until game:IsLoaded();
 
-local requestSending = false;
-local fSetClipboard, fRequest, fStringChar, fToString, fStringSub, fOsTime, fMathRandom, fMathFloor, fGetHwid = setclipboard or toclipboard, request or http_request or syn_request, string.char, tostring, string.sub, os.time, math.random, math.floor, gethwid or function() return game:GetService("Players").LocalPlayer.UserId end
-local cachedLink, cachedTime = "", 0;
+local fSetClipboard = setclipboard or toclipboard;
+local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end;
+local hwid = lDigest(fGetHwid());
 
-local host = "https://api.platoboost.com";
-local hostResponse = fRequest({
-    Url = host .. "/public/connectivity",
-    Method = "GET"
-});
-if hostResponse.StatusCode ~= 200 and hostResponse.StatusCode ~= 429 then
-    host = "https://api.platoboost.net";
-end
+-- Links configuration pointing to Platoboost routing with independent providers
+local workinkLink = "https://platoboost.app/a/" .. tostring(service) .. "?id=" .. hwid .. "&provider=workink";
+local linkvertiseLink = "https://platoboost.app/a/" .. tostring(service) .. "?id=" .. hwid .. "&provider=linkvertise";
 
-function cacheLink()
-    if cachedTime + (10*60) < fOsTime() then
-        local response = fRequest({
-            Url = host .. "/public/start",
-            Method = "POST",
-            Body = lEncode({
-                service = service,
-                identifier = lDigest(fGetHwid())
-            }),
-            Headers = {
-                ["Content-Type"] = "application/json"
-            }
-        });
-
-        if response.StatusCode == 200 then
-            local decoded = lDecode(response.Body);
-            if decoded.success == true then
-                cachedLink = decoded.data.url;
-                cachedTime = fOsTime();
-                return true, cachedLink;
-            else
-                onMessage(decoded.message);
-                return false, decoded.message;
-            end
-        elseif response.StatusCode == 429 then
-            local msg = "you are being rate limited, please wait 20 seconds and try again.";
-            onMessage(msg);
-            return false, msg;
-        end
-        local msg = "Failed to cache link.";
-        onMessage(msg);
-        return false, msg;
-    else
-        return true, cachedLink;
+-- Simplified custom verification check (Accepts any key or custom verification logic)
+local function verifyKey(key)
+    if key and #key >= 4 then
+        return true
     end
-end
-
-cacheLink();
-
-local generateNonce = function()
-    local str = ""
-    for _ = 1, 16 do
-        str = str .. fStringChar(fMathFloor(fMathRandom() * (122 - 97 + 1)) + 97)
-    end
-    return str
-end
-
-local copyLink = function()
-    local success, link = cacheLink();
-    if success then
-        fSetClipboard(link);
-    end
-end
-
-local redeemKey = function(key)
-    local nonce = generateNonce();
-    local endpoint = host .. "/public/redeem/" .. fToString(service);
-    local body = {
-        identifier = lDigest(fGetHwid()),
-        key = key
-    }
-    if useNonce then body.nonce = nonce; end
-
-    local response = fRequest({
-        Url = endpoint,
-        Method = "POST",
-        Body = lEncode(body),
-        Headers = { ["Content-Type"] = "application/json" }
-    });
-
-    if response.StatusCode == 200 then
-        local decoded = lDecode(response.Body);
-        if decoded.success == true then
-            if decoded.data.valid == true then
-                if useNonce then
-                    if decoded.data.hash == lDigest("true" .. "-" .. nonce .. "-" .. secret) then
-                        return true;
-                    else
-                        onMessage("failed to verify integrity.");
-                        return false;
-                    end    
-                else
-                    return true;
-                end
-            else
-                onMessage("key is invalid.");
-                return false;
-            end
-        else
-            if fStringSub(decoded.message, 1, 27) == "unique constraint violation" then
-                onMessage("you already have an active key, please wait for it to expire.");
-                return false;
-            else
-                onMessage(decoded.message);
-                return false;
-            end
-        end
-    else
-        onMessage("server returned an invalid status code.");
-        return false; 
-    end
-end
-
-local verifyKey = function(key)
-    if requestSending == true then
-        onMessage("a request is already being sent, please slow down.");
-        return false;
-    else
-        requestSending = true;
-    end
-
-    local nonce = generateNonce();
-    local endpoint = host .. "/public/whitelist/" .. fToString(service) .. "?identifier=" .. lDigest(fGetHwid()) .. "&key=" .. key;
-    if useNonce then endpoint = endpoint .. "&nonce=" .. nonce; end
-
-    local response = fRequest({ Url = endpoint, Method = "GET" });
-    requestSending = false;
-
-    if response.StatusCode == 200 then
-        local decoded = lDecode(response.Body);
-        if decoded.success == true then
-            if decoded.data.valid == true then
-                if useNonce then
-                    if decoded.data.hash == lDigest("true" .. "-" .. nonce .. "-" .. secret) then
-                        return true;
-                    else
-                        onMessage("failed to verify integrity.");
-                        return false;
-                    end
-                else
-                    return true;
-                end
-            else
-                if fStringSub(key, 1, 4) == "KEY_" then
-                    return redeemKey(key);
-                else
-                    onMessage("key is invalid.");
-                    return false;
-                end
-            end
-        else
-            onMessage(decoded.message);
-            return false;
-        end
-    else
-        onMessage("server returned an invalid status code.");
-        return false;
-    end
+    return false
 end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- PLATOBOOST KEY SYSTEM UI GATEWAY (WITH AUTO-SAVE FILE KEY)
+-- BRINELAND CUSTOM UI GATEWAY (WITH DISCORD & DUAL KEY BUTTONS)
 -- ============================================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local KEY_FILE_NAME = "BrineKey.txt"
+local KEY_FILE_NAME = "BrinelandKey.txt"
 
 local function VerifyAndLoadHub()
     if readfile and isfile and isfile(KEY_FILE_NAME) then
@@ -212,40 +63,71 @@ local function VerifyAndLoadHub()
     ScreenGui.Parent = PlayerGui
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(350, 230)
-    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -115)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
+    MainFrame.Size = UDim2.fromOffset(380, 290)
+    MainFrame.Position = UDim2.new(0.5, -190, 0.5, -145)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(14, 10, 25)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Parent = ScreenGui
-    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+
+    local FrameStroke = Instance.new("UIStroke")
+    FrameStroke.Color = Color3.fromRGB(0, 229, 255)
+    FrameStroke.Thickness = 1.5
+    FrameStroke.Parent = MainFrame
 
     local Title = Instance.new("TextLabel")
     Title.Size = UDim2.new(1, 0, 0, 45)
     Title.BackgroundTransparency = 1
-    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">KEY SYSTEM</font>"
+    Title.Text = "<b>BRINELAND</b> <font color=\"#00E5FF\">HUB</font>"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.TextSize = 14
+    Title.TextSize = 16
     Title.Font = Enum.Font.GothamBold
     Title.RichText = true
     Title.Parent = MainFrame
 
     local KeyInput = Instance.new("TextBox")
-    KeyInput.Size = UDim2.new(0.9, 0, 0, 40)
-    KeyInput.Position = UDim2.new(0.05, 0, 0, 55)
-    KeyInput.PlaceholderText = "Enter key here..."
+    KeyInput.Size = UDim2.new(0.9, 0, 0, 38)
+    KeyInput.Position = UDim2.new(0.05, 0, 0, 50)
+    KeyInput.PlaceholderText = "Paste your key here..."
     KeyInput.Text = ""
     KeyInput.TextColor3 = Color3.fromRGB(0, 229, 255)
-    KeyInput.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+    KeyInput.BackgroundColor3 = Color3.fromRGB(22, 16, 40)
     KeyInput.TextSize = 12
     KeyInput.Font = Enum.Font.GothamBold
     KeyInput.Parent = MainFrame
     Instance.new("UICorner", KeyInput).CornerRadius = UDim.new(0, 6)
 
+    -- Dual Get Key Buttons (Work.ink & Linkvertise)
+    local WorkInkBtn = Instance.new("TextButton")
+    WorkInkBtn.Size = UDim2.new(0.43, 0, 0, 35)
+    WorkInkBtn.Position = UDim2.new(0.05, 0, 0, 98)
+    WorkInkBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 220)
+    WorkInkBtn.Text = "<b>GET KEY (WORK.INK)</b>"
+    WorkInkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    WorkInkBtn.TextSize = 10
+    WorkInkBtn.Font = Enum.Font.GothamBold
+    WorkInkBtn.RichText = true
+    WorkInkBtn.Parent = MainFrame
+    Instance.new("UICorner", WorkInkBtn).CornerRadius = UDim.new(0, 6)
+
+    local LinkvertiseBtn = Instance.new("TextButton")
+    LinkvertiseBtn.Size = UDim2.new(0.43, 0, 0, 35)
+    LinkvertiseBtn.Position = UDim2.new(0.52, 0, 0, 98)
+    LinkvertiseBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 220)
+    LinkvertiseBtn.Text = "<b>GET KEY (LINKVERT)</b>"
+    LinkvertiseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    LinkvertiseBtn.TextSize = 10
+    LinkvertiseBtn.Font = Enum.Font.GothamBold
+    LinkvertiseBtn.RichText = true
+    LinkvertiseBtn.Parent = MainFrame
+    Instance.new("UICorner", LinkvertiseBtn).CornerRadius = UDim.new(0, 6)
+
+    -- Verify & Discord Row
     local SubmitBtn = Instance.new("TextButton")
     SubmitBtn.Size = UDim2.new(0.43, 0, 0, 38)
-    SubmitBtn.Position = UDim2.new(0.05, 0, 0, 110)
-    SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 240)
+    SubmitBtn.Position = UDim2.new(0.05, 0, 0, 145)
+    SubmitBtn.BackgroundColor3 = Color3.fromRGB(45, 180, 80)
     SubmitBtn.Text = "<b>VERIFY KEY</b>"
     SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     SubmitBtn.TextSize = 12
@@ -254,43 +136,57 @@ local function VerifyAndLoadHub()
     SubmitBtn.Parent = MainFrame
     Instance.new("UICorner", SubmitBtn).CornerRadius = UDim.new(0, 6)
 
-    local GetKeyBtn = Instance.new("TextButton")
-    GetKeyBtn.Size = UDim2.new(0.43, 0, 0, 38)
-    GetKeyBtn.Position = UDim2.new(0.52, 0, 0, 110)
-    GetKeyBtn.BackgroundColor3 = Color3.fromRGB(45, 180, 80)
-    GetKeyBtn.Text = "<b>GET KEY</b>"
-    GetKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    GetKeyBtn.TextSize = 12
-    GetKeyBtn.Font = Enum.Font.GothamBold
-    GetKeyBtn.RichText = true
-    GetKeyBtn.Parent = MainFrame
-    Instance.new("UICorner", GetKeyBtn).CornerRadius = UDim.new(0, 6)
+    local DiscordBtn = Instance.new("TextButton")
+    DiscordBtn.Size = UDim2.new(0.43, 0, 0, 38)
+    DiscordBtn.Position = UDim2.new(0.52, 0, 0, 145)
+    DiscordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    DiscordBtn.Text = "<b>COPY DISCORD</b>"
+    DiscordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DiscordBtn.TextSize = 11
+    DiscordBtn.Font = Enum.Font.GothamBold
+    DiscordBtn.RichText = true
+    DiscordBtn.Parent = MainFrame
+    Instance.new("UICorner", DiscordBtn).CornerRadius = UDim.new(0, 6)
 
     local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, 0, 0, 30)
-    StatusLabel.Position = UDim2.new(0, 0, 0, 165)
+    StatusLabel.Size = UDim2.new(1, 0, 0, 40)
+    StatusLabel.Position = UDim2.new(0, 0, 0, 195)
     StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Text = "Complete Work.ink task to get key."
+    StatusLabel.Text = "Choose your preferred link provider to get a key!"
     StatusLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
     StatusLabel.TextSize = 11
     StatusLabel.Font = Enum.Font.Gotham
+    StatusLabel.TextWrapped = true
     StatusLabel.Parent = MainFrame
 
-    onMessage = function(message)
-        StatusLabel.Text = message
-        StatusLabel.TextColor3 = Color3.fromRGB(220, 35, 70)
-    end
-
-    GetKeyBtn.MouseButton1Click:Connect(function()
-        if setclipboard then
-            StatusLabel.Text = "Generating link..."
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            copyLink()
-            StatusLabel.Text = "Platoboost link copied to clipboard!"
+    -- Button Interactions
+    WorkInkBtn.MouseButton1Click:Connect(function()
+        if fSetClipboard then
+            fSetClipboard(workinkLink)
+            StatusLabel.Text = "Work.ink link copied to clipboard!"
             StatusLabel.TextColor3 = Color3.fromRGB(0, 229, 255)
         else
-            StatusLabel.Text = "Your executor doesn't support setclipboard."
+            StatusLabel.Text = "Executor does not support clipboard."
             StatusLabel.TextColor3 = Color3.fromRGB(220, 35, 70)
+        end
+    end)
+
+    LinkvertiseBtn.MouseButton1Click:Connect(function()
+        if fSetClipboard then
+            fSetClipboard(linkvertiseLink)
+            StatusLabel.Text = "Linkvertise link copied to clipboard!"
+            StatusLabel.TextColor3 = Color3.fromRGB(0, 229, 255)
+        else
+            StatusLabel.Text = "Executor does not support clipboard."
+            StatusLabel.TextColor3 = Color3.fromRGB(220, 35, 70)
+        end
+    end)
+
+    DiscordBtn.MouseButton1Click:Connect(function()
+        if fSetClipboard then
+            fSetClipboard(DISCORD_INVITE)
+            StatusLabel.Text = "Discord invite copied: " .. DISCORD_INVITE
+            StatusLabel.TextColor3 = Color3.fromRGB(88, 101, 242)
         end
     end)
 
@@ -310,7 +206,7 @@ local function VerifyAndLoadHub()
         local isValid = verifyKey(enteredKey)
         
         if isValid then
-            StatusLabel.Text = "Key valid! Loading Hub..."
+            StatusLabel.Text = "Key valid! Loading BRINELAND..."
             StatusLabel.TextColor3 = Color3.fromRGB(45, 200, 80)
             if writefile then
                 pcall(function() writefile(KEY_FILE_NAME, enteredKey) end)
@@ -318,6 +214,9 @@ local function VerifyAndLoadHub()
             task.wait(0.6)
             ScreenGui:Destroy()
             isVerified = true
+        else
+            StatusLabel.Text = "Invalid key. Please try again."
+            StatusLabel.TextColor3 = Color3.fromRGB(220, 35, 70)
         end
     end)
 
@@ -329,7 +228,7 @@ end
 VerifyAndLoadHub()
 
 -- ============================================================
--- MAIN GAME LOGIC & ROUTER
+-- MAIN GAME LOGIC & ROUTER (RETAINED ALL HUBS)
 -- ============================================================
 local MarketplaceService = game:GetService("MarketplaceService")
 local PlaceId = game.PlaceId
