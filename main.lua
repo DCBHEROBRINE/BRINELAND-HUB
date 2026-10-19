@@ -1951,4 +1951,4 @@ elseif nameLower:find("keyboard escape") or nameLower:find("+1 speed") then
 else
     print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
-endbb45be62bf7a5ad09fa7969d7d5fd45966c118db20dcb833623f2659f0b3d1b7
+end
