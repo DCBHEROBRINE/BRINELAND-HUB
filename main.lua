@@ -1,5 +1,5 @@
 -- ============================================================
--- BRINELAND MASTER MULTI-GAME HUB + DUAL KEY SYSTEM (WORK.INK / LINKVERTISE)
+-- BRINELAND MASTER MULTI-GAME HUB + WORK.INK KEY SYSTEM
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- Discord: https://discord.gg/epWMbuXSN5
 -- ============================================================
@@ -12,21 +12,19 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 -------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------
---! custom service & key gateway configuration
-local service = "34545"
-local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5"
+--! custom service & key gateway configuration (WORK.INK ONLY)
+local service = "34545"; 
+local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5";
 
-repeat task.wait(1) until game:IsLoaded()
+repeat task.wait(1) until game:IsLoaded();
 
-local fSetClipboard = setclipboard or toclipboard
-local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end
-local hwid = lDigest(fGetHwid())
+local fSetClipboard = setclipboard or toclipboard;
+local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end;
+local hwid = lDigest(fGetHwid());
 
--- Fixed Platoboost standard gateway URLs
-local workinkLink = "https://gateway.platoboost.com/a/" .. service .. "?id=" .. hwid
-local linkvertiseLink = "https://gateway.platoboost.com/a/" .. service .. "?id=" .. hwid
+-- Using the working Platorelay domain for Work.ink
+local workinkLink = "https://auth.platorelay.com/a/" .. service .. "?id=" .. hwid .. "&provider=workink";
 
--- Key verification logic
 local function verifyKey(key)
     if key and #key >= 4 then
         return true
@@ -36,7 +34,7 @@ end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- BRINELAND CUSTOM UI GATEWAY (WITH DISCORD & DUAL KEY BUTTONS)
+-- BRINELAND CUSTOM UI GATEWAY (SINGLE WORK.INK BUTTON)
 -- ============================================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -63,8 +61,8 @@ local function VerifyAndLoadHub()
     ScreenGui.Parent = PlayerGui
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(380, 290)
-    MainFrame.Position = UDim2.new(0.5, -190, 0.5, -145)
+    MainFrame.Size = UDim2.fromOffset(380, 260)
+    MainFrame.Position = UDim2.new(0.5, -190, 0.5, -130)
     MainFrame.BackgroundColor3 = Color3.fromRGB(14, 10, 25)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
@@ -98,35 +96,23 @@ local function VerifyAndLoadHub()
     KeyInput.Parent = MainFrame
     Instance.new("UICorner", KeyInput).CornerRadius = UDim.new(0, 6)
 
-    -- Dual Get Key Buttons
+    -- Single Get Key Button (Work.ink) taking full width
     local WorkInkBtn = Instance.new("TextButton")
-    WorkInkBtn.Size = UDim2.new(0.43, 0, 0, 35)
+    WorkInkBtn.Size = UDim2.new(0.9, 0, 0, 35)
     WorkInkBtn.Position = UDim2.new(0.05, 0, 0, 98)
     WorkInkBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 220)
     WorkInkBtn.Text = "<b>GET KEY (WORK.INK)</b>"
     WorkInkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    WorkInkBtn.TextSize = 10
+    WorkInkBtn.TextSize = 11
     WorkInkBtn.Font = Enum.Font.GothamBold
     WorkInkBtn.RichText = true
     WorkInkBtn.Parent = MainFrame
     Instance.new("UICorner", WorkInkBtn).CornerRadius = UDim.new(0, 6)
 
-    local LinkvertiseBtn = Instance.new("TextButton")
-    LinkvertiseBtn.Size = UDim2.new(0.43, 0, 0, 35)
-    LinkvertiseBtn.Position = UDim2.new(0.52, 0, 0, 98)
-    LinkvertiseBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 220)
-    LinkvertiseBtn.Text = "<b>GET KEY (LINKVERT)</b>"
-    LinkvertiseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    LinkvertiseBtn.TextSize = 10
-    LinkvertiseBtn.Font = Enum.Font.GothamBold
-    LinkvertiseBtn.RichText = true
-    LinkvertiseBtn.Parent = MainFrame
-    Instance.new("UICorner", LinkvertiseBtn).CornerRadius = UDim.new(0, 6)
-
     -- Verify & Discord Row
     local SubmitBtn = Instance.new("TextButton")
     SubmitBtn.Size = UDim2.new(0.43, 0, 0, 38)
-    SubmitBtn.Position = UDim2.new(0.05, 0, 0, 145)
+    SubmitBtn.Position = UDim2.new(0.05, 0, 0, 142)
     SubmitBtn.BackgroundColor3 = Color3.fromRGB(45, 180, 80)
     SubmitBtn.Text = "<b>VERIFY KEY</b>"
     SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -138,7 +124,7 @@ local function VerifyAndLoadHub()
 
     local DiscordBtn = Instance.new("TextButton")
     DiscordBtn.Size = UDim2.new(0.43, 0, 0, 38)
-    DiscordBtn.Position = UDim2.new(0.52, 0, 0, 145)
+    DiscordBtn.Position = UDim2.new(0.52, 0, 0, 142)
     DiscordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
     DiscordBtn.Text = "<b>COPY DISCORD</b>"
     DiscordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -150,9 +136,9 @@ local function VerifyAndLoadHub()
 
     local StatusLabel = Instance.new("TextLabel")
     StatusLabel.Size = UDim2.new(1, 0, 0, 40)
-    StatusLabel.Position = UDim2.new(0, 0, 0, 195)
+    StatusLabel.Position = UDim2.new(0, 0, 0, 188)
     StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Text = "Choose your preferred link provider to get a key!"
+    StatusLabel.Text = "Click Get Key to complete Work.ink verification!"
     StatusLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
     StatusLabel.TextSize = 11
     StatusLabel.Font = Enum.Font.Gotham
@@ -171,21 +157,10 @@ local function VerifyAndLoadHub()
         end
     end)
 
-    LinkvertiseBtn.MouseButton1Click:Connect(function()
-        if fSetClipboard then
-            fSetClipboard(linkvertiseLink)
-            StatusLabel.Text = "Linkvertise link copied to clipboard!"
-            StatusLabel.TextColor3 = Color3.fromRGB(0, 229, 255)
-        else
-            StatusLabel.Text = "Executor does not support clipboard."
-            StatusLabel.TextColor3 = Color3.fromRGB(220, 35, 70)
-        end
-    end)
-
     DiscordBtn.MouseButton1Click:Connect(function()
         if fSetClipboard then
             fSetClipboard(DISCORD_INVITE)
-            StatusLabel.Text = "Discord invite copied: " .. DISCORD_INVITE
+            StatusLabel.Text = "Discord invite copied!"
             StatusLabel.TextColor3 = Color3.fromRGB(88, 101, 242)
         end
     end)
