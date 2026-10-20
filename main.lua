@@ -15,8 +15,8 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 --! CONFIGURATION
 local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5"
 
--- DIRECT WORK.INK LINK FROM YOUR SCRIPT SNIPPET:
-local workinkLink = "https://work.ink/1WN4/c5af7607-5291-4713-a04c-0cd13287986a"
+-- DIRECT WORK.INK LINK
+local workinkLink = "https://work.ink/1WN4/3a52712f-c0a5-403f-bbb5-c66c6ddb8b15"
 
 repeat task.wait(1) until game:IsLoaded()
 
