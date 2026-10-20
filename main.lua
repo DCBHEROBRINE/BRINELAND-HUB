@@ -12,18 +12,18 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 -------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------
---! custom service & key gateway configuration (WORK.INK ONLY)
-local service = "34545"; 
-local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5";
+--! custom service & key gateway configuration
+local service = "34545"
+local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5"
 
-repeat task.wait(1) until game:IsLoaded();
+repeat task.wait(1) until game:IsLoaded()
 
-local fSetClipboard = setclipboard or toclipboard;
-local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end;
-local hwid = lDigest(fGetHwid());
+local fSetClipboard = setclipboard or toclipboard
+local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end
+local hwid = lDigest(fGetHwid())
 
--- Using the working Platorelay domain for Work.ink
-local workinkLink = "https://auth.platorelay.com/a/" .. service .. "?id=" .. hwid .. "&provider=workink";
+-- Fixed Platoboost standard gateway format for Work.ink
+local workinkLink = "https://platoboost.com/a/" .. service .. "?id=" .. hwid
 
 local function verifyKey(key)
     if key and #key >= 4 then
@@ -34,7 +34,7 @@ end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- BRINELAND CUSTOM UI GATEWAY (SINGLE WORK.INK BUTTON)
+-- BRINELAND CUSTOM UI GATEWAY (WORK.INK ONLY)
 -- ============================================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -96,7 +96,6 @@ local function VerifyAndLoadHub()
     KeyInput.Parent = MainFrame
     Instance.new("UICorner", KeyInput).CornerRadius = UDim.new(0, 6)
 
-    -- Single Get Key Button (Work.ink) taking full width
     local WorkInkBtn = Instance.new("TextButton")
     WorkInkBtn.Size = UDim2.new(0.9, 0, 0, 35)
     WorkInkBtn.Position = UDim2.new(0.05, 0, 0, 98)
@@ -109,7 +108,6 @@ local function VerifyAndLoadHub()
     WorkInkBtn.Parent = MainFrame
     Instance.new("UICorner", WorkInkBtn).CornerRadius = UDim.new(0, 6)
 
-    -- Verify & Discord Row
     local SubmitBtn = Instance.new("TextButton")
     SubmitBtn.Size = UDim2.new(0.43, 0, 0, 38)
     SubmitBtn.Position = UDim2.new(0.05, 0, 0, 142)
@@ -145,7 +143,6 @@ local function VerifyAndLoadHub()
     StatusLabel.TextWrapped = true
     StatusLabel.Parent = MainFrame
 
-    -- Button Interactions
     WorkInkBtn.MouseButton1Click:Connect(function()
         if fSetClipboard then
             fSetClipboard(workinkLink)
@@ -199,11 +196,10 @@ local function VerifyAndLoadHub()
     return true
 end
 
--- Run Key Gate First
 VerifyAndLoadHub()
 
 -- ============================================================
--- MAIN GAME LOGIC & ROUTER (RETAINED ALL HUBS)
+-- MAIN GAME LOGIC & ROUTER
 -- ============================================================
 local MarketplaceService = game:GetService("MarketplaceService")
 local PlaceId = game.PlaceId
@@ -332,7 +328,6 @@ local function RunTaxiBoss()
         end
     end)
 
-    -- GUI Construction
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "TaxiBossCustomHub"
     ScreenGui.ResetOnSpawn = false
@@ -867,7 +862,6 @@ local function RunStealAnEgg()
         end
     end)
 
-    -- GUI Construction
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "StealAnEggHubV7"
     ScreenGui.ResetOnSpawn = false
@@ -1466,7 +1460,6 @@ local function RunUniversalScript()
         end
     end
 
-    -- UI Construction
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "BrinelandUniversalHub"
     ScreenGui.ResetOnSpawn = false
