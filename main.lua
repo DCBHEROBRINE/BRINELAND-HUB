@@ -13,7 +13,7 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 
 -------------------------------------------------------------------------------
 --! custom service & key gateway configuration
-local service = "34545"; -- Strictly set as a string to prevent concatenation cutoff
+local service = "34545"; 
 local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5";
 
 repeat task.wait(1) until game:IsLoaded();
@@ -1880,7 +1880,7 @@ local function RunUniversalScript()
                 tpInstantBtn.MouseButton1Click:Connect(function()
                     local c = LocalPlayer.Character
                     local h = c and c:FindFirstChild("HumanoidRootPart")
-                    if h me then h.CFrame = savedCFrame end
+                    if h then h.CFrame = savedCFrame end
                 end)
 
                 walkBtn.MouseButton1Click:Connect(function()
