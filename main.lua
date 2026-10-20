@@ -12,7 +12,7 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 -------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------
---! custom service & key gateway configuration (UPDATED TO GATEWAY DOMAIN)
+--! custom service & key gateway configuration (UPDATED TO PLATORELAY DOMAIN)
 local service = 34545;  
 local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5";
 
@@ -22,11 +22,11 @@ local fSetClipboard = setclipboard or toclipboard;
 local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end;
 local hwid = lDigest(fGetHwid());
 
--- Links configuration pointing to the correct Platoboost gateway domain
-local workinkLink = "https://gateway.platoboost.com/a/" .. tostring(service) .. "?id=" .. hwid .. "&provider=workink";
-local linkvertiseLink = "https://gateway.platoboost.com/a/" .. tostring(service) .. "?id=" .. hwid .. "&provider=linkvertise";
+-- Links configuration pointing to the alternative Platorelay domain
+local workinkLink = "https://auth.platorelay.com/a/" .. tostring(service) .. "?id=" .. hwid .. "&provider=workink";
+local linkvertiseLink = "https://auth.platorelay.com/a/" .. tostring(service) .. "?id=" .. hwid .. "&provider=linkvertise";
 
--- Simplified custom verification check (Accepts any key or custom verification logic)
+-- Simplified custom verification check
 local function verifyKey(key)
     if key and #key >= 4 then
         return true
