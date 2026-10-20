@@ -1,5 +1,5 @@
 -- ============================================================
--- BRINELAND MASTER MULTI-GAME HUB + WORK.INK KEY SYSTEM
+-- BRINELAND MASTER MULTI-GAME HUB + DIRECT WORK.INK KEY SYSTEM
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- Discord: https://discord.gg/epWMbuXSN5
 -- ============================================================
@@ -12,18 +12,17 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 -------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------
---! custom service & key gateway configuration
-local service = "34545"
+--! CONFIGURATION
 local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5"
+
+-- PASTE YOUR FULL WORK.INK URL FROM YOUR TASK PROFILE BELOW:
+local workinkLink = "https://work.ink/YOUR_WORK_INK_LINK_HERE"
 
 repeat task.wait(1) until game:IsLoaded()
 
 local fSetClipboard = setclipboard or toclipboard
 local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end
 local hwid = lDigest(fGetHwid())
-
--- Fixed Platoboost standard gateway format for Work.ink
-local workinkLink = "https://platoboost.com/a/" .. service .. "?id=" .. hwid
 
 local function verifyKey(key)
     if key and #key >= 4 then
