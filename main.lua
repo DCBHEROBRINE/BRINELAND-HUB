@@ -1,5 +1,5 @@
 -- ============================================================
--- BRINELAND MASTER MULTI-GAME HUB + DIRECT WORK.INK KEY SYSTEM
+-- BRINELAND MASTER MULTI-GAME HUB + WORK.INK KEY SYSTEM
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- Discord: https://discord.gg/epWMbuXSN5
 -- ============================================================
@@ -15,8 +15,8 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 --! CONFIGURATION
 local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5"
 
--- PASTE YOUR FULL WORK.INK URL FROM YOUR TASK PROFILE BELOW:
-local workinkLink = "https://work.ink/YOUR_WORK_INK_LINK_HERE"
+-- DIRECT WORK.INK LINK FROM YOUR SCRIPT SNIPPET:
+local workinkLink = "https://work.ink/1WN4/c5af7607-5291-4713-a04c-0cd13287986a"
 
 repeat task.wait(1) until game:IsLoaded()
 
