@@ -13,20 +13,20 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 
 -------------------------------------------------------------------------------
 --! custom service & key gateway configuration
-local service = "34545"; 
-local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5";
+local service = "34545"
+local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5"
 
-repeat task.wait(1) until game:IsLoaded();
+repeat task.wait(1) until game:IsLoaded()
 
-local fSetClipboard = setclipboard or toclipboard;
-local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end;
-local hwid = lDigest(fGetHwid());
+local fSetClipboard = setclipboard or toclipboard
+local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end
+local hwid = lDigest(fGetHwid())
 
--- Explicitly formatted full Platorelay link strings
-local workinkLink = "https://auth.platorelay.com/a/" .. service .. "?id=" .. hwid .. "&provider=workink";
-local linkvertiseLink = "https://auth.platorelay.com/a/" .. service .. "?id=" .. hwid .. "&provider=linkvertise";
+-- Fixed Platoboost standard gateway URLs
+local workinkLink = "https://gateway.platoboost.com/a/" .. service .. "?id=" .. hwid
+local linkvertiseLink = "https://gateway.platoboost.com/a/" .. service .. "?id=" .. hwid
 
--- Simplified custom verification check
+-- Key verification logic
 local function verifyKey(key)
     if key and #key >= 4 then
         return true
@@ -98,7 +98,7 @@ local function VerifyAndLoadHub()
     KeyInput.Parent = MainFrame
     Instance.new("UICorner", KeyInput).CornerRadius = UDim.new(0, 6)
 
-    -- Dual Get Key Buttons (Work.ink & Linkvertise)
+    -- Dual Get Key Buttons
     local WorkInkBtn = Instance.new("TextButton")
     WorkInkBtn.Size = UDim2.new(0.43, 0, 0, 35)
     WorkInkBtn.Position = UDim2.new(0.05, 0, 0, 98)
