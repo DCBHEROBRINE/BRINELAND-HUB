@@ -12,8 +12,8 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 -------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------
---! custom service & key gateway configuration (UPDATED TO PLATORELAY DOMAIN)
-local service = 34545;  
+--! custom service & key gateway configuration
+local service = "34545"; -- Strictly set as a string to prevent concatenation cutoff
 local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5";
 
 repeat task.wait(1) until game:IsLoaded();
@@ -22,9 +22,9 @@ local fSetClipboard = setclipboard or toclipboard;
 local fGetHwid = gethwid or function() return game:GetService("Players").LocalPlayer.UserId end;
 local hwid = lDigest(fGetHwid());
 
--- Links configuration pointing to the alternative Platorelay domain
-local workinkLink = "https://auth.platorelay.com/a/" .. tostring(service) .. "?id=" .. hwid .. "&provider=workink";
-local linkvertiseLink = "https://auth.platorelay.com/a/" .. tostring(service) .. "?id=" .. hwid .. "&provider=linkvertise";
+-- Explicitly formatted full Platorelay link strings
+local workinkLink = "https://auth.platorelay.com/a/" .. service .. "?id=" .. hwid .. "&provider=workink";
+local linkvertiseLink = "https://auth.platorelay.com/a/" .. service .. "?id=" .. hwid .. "&provider=linkvertise";
 
 -- Simplified custom verification check
 local function verifyKey(key)
@@ -1880,7 +1880,7 @@ local function RunUniversalScript()
                 tpInstantBtn.MouseButton1Click:Connect(function()
                     local c = LocalPlayer.Character
                     local h = c and c:FindFirstChild("HumanoidRootPart")
-                    if h then h.CFrame = savedCFrame end
+                    if h me then h.CFrame = savedCFrame end
                 end)
 
                 walkBtn.MouseButton1Click:Connect(function()
