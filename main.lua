@@ -1267,47 +1267,7 @@ local function RunStealAnEgg()
 end
 
 -- ============================================================
--- SCRIPT 3: KEYBOARD ESCAPE
--- ============================================================
-local function RunKeyboardEscape()
-    if _G.BrinelandScriptLoaded then return end
-    _G.BrinelandScriptLoaded = true
-
-    local RunService  = game:GetService("RunService")
-    local Players     = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
-
-    local customName = "BRINELAND"
-    local customAnimName = "BRINELAND"
-    local unlockPacks = {"Premium", "Water", "Bubble", "Christmas", "Lava", "Honey", "Snow", "Slime", customAnimName}
-
-    for _, packName in ipairs(unlockPacks) do
-        LocalPlayer:SetAttribute("Sound_" .. packName, true)
-        LocalPlayer:SetAttribute("Owns_" .. packName, true)
-        LocalPlayer:SetAttribute("Anim_" .. packName, true)
-        LocalPlayer:SetAttribute("Unlocked_" .. packName, true)
-    end
-
-    LocalPlayer:SetAttribute("CustomName", customName)
-    LocalPlayer:SetAttribute("SelectedAnimation", customAnimName)
-
-    local function unlockGuiElements()
-        for _, guiObj in ipairs(PlayerGui:GetDescendants()) do
-            local nameLower = guiObj.Name:lower()
-            if nameLower:find("sound") or nameLower:find("anim") then
-                if guiObj:IsA("ImageButton") or guiObj:IsA("TextButton") then guiObj.Active = true end
-                if guiObj:IsA("ImageLabel") and (nameLower:find("lock") or nameLower:find("padlock")) then guiObj.Visible = false end
-            end
-        end
-    end
-
-    unlockGuiElements()
-    PlayerGui.DescendantAdded:Connect(unlockGuiElements)
-end
-
--- ============================================================
--- SCRIPT 4: UNIVERSAL HUB (FALLBACK)
+-- SCRIPT 3: UNIVERSAL HUB (FALLBACK)
 -- ============================================================
 local function RunUniversalScript()
     local TweenService     = game:GetService("TweenService")
@@ -1333,6 +1293,7 @@ local function RunUniversalScript()
         AutoAimRange = 60,
         Gravity      = 196.2,
         TweenSpeed   = 80,
+        FastInteract = false,
         SavedCFrames = {}
     }
 
@@ -1448,6 +1409,13 @@ local function RunUniversalScript()
         if Config.Noclip then
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
+            end
+        end
+        if Config.FastInteract then
+            for _, prompt in ipairs(Workspace:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") then
+                    prompt.HoldDuration = 0
+                end
             end
         end
     end)
@@ -1996,6 +1964,11 @@ local function RunUniversalScript()
     CreateSlider(PlayerTab, "Fly Speed", 10, 300, Config.FlySpeed, true, function(val) Config.FlySpeed = val end)
     CreateToggle(PlayerTab, "Noclip", function(state) Config.Noclip = state end)
 
+    -- Added Fast Interact toggle button
+    CreateToggle(PlayerTab, "Fast Interact", function(state)
+        Config.FastInteract = state
+    end)
+
     CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
 end
 
@@ -2010,9 +1983,6 @@ if nameLower:find("taxi boss") or PlaceId == 7305826609 then
 elseif nameLower:find("steal an egg") or PlaceId == 115049386348611 then
     print("[BRINELAND] Detected Steal An Egg. Executing script...")
     RunStealAnEgg()
-elseif nameLower:find("keyboard escape") or nameLower:find("+1 speed") then
-    print("[BRINELAND] Detected +1 Speed Keyboard Escape. Executing script...")
-    RunKeyboardEscape()
 else
     print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
