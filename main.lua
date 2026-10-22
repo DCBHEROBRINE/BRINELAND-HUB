@@ -1267,109 +1267,7 @@ local function RunStealAnEgg()
 end
 
 -- ============================================================
--- SCRIPT 3: BLOX FRUITS HUB (BOCCHI SCRIPT ROUTED)
--- ============================================================
-local function RunBloxFruits()
-    -- Pasted & configured full Bocchi Hub backend logic for Blox Fruits
-    pcall(function()
-        if typeof(task) ~= "table" then
-            getfenv().task = {}
-        end
-        if typeof(task.wait) ~= "function" then
-            task.wait = function(n)
-                if typeof(wait) == "function" then return wait(n or 0) end
-                return 0
-            end
-        end
-        if typeof(task.spawn) ~= "function" then
-            task.spawn = function(f, ...)
-                if typeof(spawn) == "function" then return spawn(f) end
-                if typeof(coroutine) == "table" and coroutine.wrap then return coroutine.wrap(f)(...) end
-                return f(...)
-            end
-        end
-        if typeof(task.delay) ~= "function" then
-            task.delay = function(n, f)
-                if typeof(delay) == "function" then return delay(n, f) end
-                task.spawn(function() task.wait(n) f() end)
-            end
-        end
-        if typeof(task.defer) ~= "function" then
-            task.defer = task.spawn
-        end
-        if typeof(setfpscap) ~= "function" then
-            getfenv().setfpscap = function() end
-        end
-    end)
-
-    print("========================================")
-    print("[Bocchi Hub] SCRIPT INJECTED SUCCESSFULLY!")
-    print("[Bocchi Hub] Initializing modules...")
-    print("========================================")
-
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Bocchi Hub",
-            Text = "Script đang khởi động... Vui lòng đợi!",
-            Duration = 5
-        })
-    end)
-
-    Config = Config or {
-        Team = "Pirates",
-        Configuration = {
-            HideallPath = false,
-            blackscreen = false,
-            HideGui = false,
-            HopWhenIdle = false,
-            AutoHop = false,
-            AutoHopDelay = 60 * 60,
-            FpsBoost = false,
-            ["IdleCheck"] = 0,
-        },
-        Items = {
-            AutoFullyMelees = true,
-            Saber = true,
-            AutoFarmFruitMastery = false,
-            AutoEatFruit = 1,
-            Eatlist = {},
-            FruitGacha = true,
-            FruitGachaDelay = 60,
-            FruitGachaFailDelay = 600,
-            FruitGachaBox = "ZiolesGacha",
-            FruitGachaCost = 0
-        },
-        Settings = {
-            ["Fragments"] = 5000,
-            FruitRescanDelay = 45,
-            FruitDeepScanDelay = 300,
-            FruitReachTimeout = 30,
-            FruitSkipDuration = 90,
-            QuestGracePeriod = 25,
-            QuestStartTimeout = 1.0,
-            QuestGoneDelay = 20,
-            MinFarmDuration = 2.5,
-        }
-    }
-
-    local loadedStart = tick()
-    while not game:IsLoaded() and tick() - loadedStart < 10 do
-        task.wait(0.5)
-    end
-    task.wait(0.5)
-
-    -- Game router & loop setups embedded safely...
-    local PlaceId = game.PlaceId
-    local SeaIndex = 1
-    if PlaceId == 2753915549 then SeaIndex = 1
-    elseif PlaceId == 4442272183 then SeaIndex = 2
-    elseif PlaceId == 7449423635 then SeaIndex = 3 end
-    
-    print("[Brineland] Blox Fruits Module Initialized Successfully for Sea " .. tostring(SeaIndex))
-end
-
--- ============================================================
--- SCRIPT 4: UNIVERSAL HUB (FALLBACK)
+-- SCRIPT 3: UNIVERSAL HUB (FALLBACK)
 -- ============================================================
 local function RunUniversalScript()
     local TweenService     = game:GetService("TweenService")
@@ -2078,22 +1976,12 @@ end
 -- ============================================================
 local nameLower = gameName:lower()
 
--- Blox Fruits Place ID constants lookup support (Sea 1, Sea 2, Sea 3)
-local BLOX_FRUITS_IDS = {
-    [2753915549] = true, -- First Sea
-    [4442272183] = true, -- Second Sea
-    [7449423635] = true, -- Third Sea
-}
-
 if nameLower:find("taxi boss") or PlaceId == 7305826609 then
     print("[BRINELAND] Detected Taxi Boss. Executing script...")
     RunTaxiBoss()
 elseif nameLower:find("steal an egg") or PlaceId == 115049386348611 then
     print("[BRINELAND] Detected Steal An Egg. Executing script...")
     RunStealAnEgg()
-elseif BLOX_FRUITS_IDS[PlaceId] or nameLower:find("blox fruit") then
-    print("[BRINELAND] Detected Blox Fruits. Executing script...")
-    RunBloxFruits()
 else
     print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
