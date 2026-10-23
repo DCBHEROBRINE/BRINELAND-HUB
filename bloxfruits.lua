@@ -80,7 +80,6 @@ end
 -- ============================================================
 -- KILL AURA ENGINE
 -- ============================================================
-
 task.spawn(function()
     while task.wait(0.08) do
         if Config.KillAura then
@@ -90,9 +89,6 @@ task.spawn(function()
                 local tool = char and char:FindFirstChildOfClass("Tool")
 
                 if hrp and tool then
-                    local targetsFound = false
-
-                    -- Scan Workspace for Enemies, Bosses, and Players
                     for _, obj in ipairs(Workspace:GetDescendants()) do
                         if obj:IsA("Model") and obj ~= char then
                             local hum = obj:FindFirstChildOfClass("Humanoid")
@@ -101,11 +97,7 @@ task.spawn(function()
                             if hum and hum.Health > 0 and targetHrp then
                                 local distance = (targetHrp.Position - hrp.Position).Magnitude
                                 if distance <= Config.KillAuraRange then
-                                    targetsFound = true
-                                    -- Trigger attack on the equipped weapon
-                                    pcall(function()
-                                        tool:Activate()
-                                    end)
+                                    pcall(function() tool:Activate() end)
                                 end
                             end
                         end
@@ -119,7 +111,6 @@ end)
 -- ============================================================
 -- DYNAMIC SPAWNED DETECTORS (BOSSES & NPCS)
 -- ============================================================
-
 local function GetSpawnedBosses()
     local spawnedBosses = {}
     local enemies = Workspace:FindFirstChild("Enemies") or Workspace
@@ -158,8 +149,6 @@ end
 -- ============================================================
 -- GACHA, BOSS & FPS ENGINE
 -- ============================================================
-
--- Remove Gacha Cutscene
 task.spawn(function()
     while task.wait(0.1) do
         if Config.RemoveGachaAnim then
@@ -174,7 +163,6 @@ task.spawn(function()
     end
 end)
 
--- Auto Gacha Loop
 task.spawn(function()
     while task.wait(2) do
         if Config.AutoGacha then
@@ -187,7 +175,6 @@ task.spawn(function()
     end
 end)
 
--- Boss Kill Engine
 task.spawn(function()
     while task.wait(0.2) do
         if Config.KillBoss and Config.SelectedBoss ~= "No Boss Spawned" and Config.SelectedBoss ~= "None" then
@@ -210,13 +197,11 @@ task.spawn(function()
     end
 end)
 
--- FPS Booster
 local function ApplyFPSBoost()
     pcall(function()
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 9e9
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-
         for _, v in ipairs(Workspace:GetDescendants()) do
             if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
                 v.Material = Enum.Material.SmoothPlastic
@@ -231,9 +216,8 @@ local function ApplyFPSBoost()
 end
 
 -- ============================================================
--- ESP SYSTEMS (PLAYER, INVENTORY, FRUIT & ISLAND)
+-- ESP SYSTEMS
 -- ============================================================
-
 RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if char then
@@ -245,7 +229,6 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Island ESP System
 local Islands = {
     ["Marine Starter"] = CFrame.new(2449, 7, 1145),
     ["Pirate Starter"] = CFrame.new(1062, 16, 1423),
@@ -263,42 +246,38 @@ local Islands = {
 
 local IslandESPFolder = Instance.new("Folder", Workspace)
 IslandESPFolder.Name = "BrinelandIslandESP"
-
 local IslandTags = {}
-local function SetupIslandESP()
-    for name, cf in pairs(Islands) do
-        local part = Instance.new("Part")
-        part.Size = Vector3.new(1, 1, 1)
-        part.CFrame = cf
-        part.Anchored = true
-        part.Transparency = 1
-        part.CanCollide = false
-        part.Parent = IslandESPFolder
 
-        local bb = Instance.new("BillboardGui")
-        bb.Adornee = part
-        bb.Size = UDim2.fromOffset(160, 40)
-        bb.AlwaysOnTop = true
+for name, cf in pairs(Islands) do
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(1, 1, 1)
+    part.CFrame = cf
+    part.Anchored = true
+    part.Transparency = 1
+    part.CanCollide = false
+    part.Parent = IslandESPFolder
 
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, 0, 1, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.TextColor3 = Color3.fromRGB(0, 229, 255)
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextSize = 11
-        lbl.RichText = true
-        lbl.Parent = bb
-        bb.Parent = part
+    local bb = Instance.new("BillboardGui")
+    bb.Adornee = part
+    bb.Size = UDim2.fromOffset(160, 40)
+    bb.AlwaysOnTop = true
 
-        IslandTags[name] = { Part = part, Label = lbl, Billboard = bb }
-    end
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3 = Color3.fromRGB(0, 229, 255)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 11
+    lbl.RichText = true
+    lbl.Parent = bb
+    bb.Parent = part
+
+    IslandTags[name] = { Part = part, Label = lbl, Billboard = bb }
 end
-SetupIslandESP()
 
 RunService.Heartbeat:Connect(function()
     local myChar = LocalPlayer.Character
     local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
     for name, data in pairs(IslandTags) do
         if Config.IslandESP and myHrp then
             data.Billboard.Enabled = true
@@ -310,7 +289,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Fruit ESP
 local FruitESPStorage = {}
 RunService.Heartbeat:Connect(function()
     if not Config.FruitESP then
@@ -347,7 +325,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Player ESP & Hotbar Inventory Inspector
 local ESPStorage = {}
 local function RemovePlayerESP(player)
     if ESPStorage[player] then
@@ -360,11 +337,9 @@ end
 
 local function CreatePlayerESP(player)
     if player == LocalPlayer then return end
-
     local function CharacterAdded(char)
         RemovePlayerESP(player)
         if not char then return end
-
         local hrp = char:WaitForChild("HumanoidRootPart", 5)
         local hum = char:WaitForChild("Humanoid", 5)
         if not hrp or not hum then return end
@@ -419,7 +394,6 @@ local function CreatePlayerESP(player)
                 billboard.Enabled = false; highlight.Enabled = false
                 return
             end
-
             local myChar = LocalPlayer.Character
             local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
             local dist = myHrp and math.floor((hrp.Position - myHrp.Position).Magnitude) or 0
@@ -433,25 +407,19 @@ local function CreatePlayerESP(player)
                 local tools = {}
                 local equipped = char:FindFirstChildOfClass("Tool")
                 if equipped then table.insert(tools, "⚔️" .. equipped.Name) end
-
                 local backpack = player:FindFirstChild("Backpack")
                 if backpack then
                     for _, item in ipairs(backpack:GetChildren()) do
-                        if item:IsA("Tool") and #tools < 4 then
-                            table.insert(tools, item.Name)
-                        end
+                        if item:IsA("Tool") and #tools < 4 then table.insert(tools, item.Name) end
                     end
                 end
-
                 invLabel.Text = "<b>[Inv: " .. (#tools > 0 and table.concat(tools, ", ") or "Empty") .. "]</b>"
             else
                 invLabel.Visible = false
             end
         end)
-
         ESPStorage[player] = { Highlight = highlight, Billboard = billboard, Connection = updateConn }
     end
-
     if player.Character then CharacterAdded(player.Character) end
     player.CharacterAdded:Connect(CharacterAdded)
 end
@@ -469,7 +437,7 @@ local function ToggleESPState(state)
 end
 
 -- ============================================================
--- USER INTERFACE DESIGN
+-- USER INTERFACE
 -- ============================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BrinelandBloxFruitsHub"
@@ -651,7 +619,6 @@ TabFrames["Main"].Container.Visible = true
 TabFrames["Main"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
 TabFrames["Main"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
 
--- Draggable window
 local dragging, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -666,7 +633,6 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 UserInputService.InputEnded:Connect(function() dragging = false end)
 
--- UI Building Tools
 local function CreateToggle(parent, text, initialVal, callback)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, -4, 0, 38)
@@ -832,14 +798,11 @@ end
 -- ============================================================
 -- POPULATE TABS
 -- ============================================================
-
--- 1. Main Tab (Kill Aura & Gacha)
 CreateToggle(MainTab, "Enable Kill Aura", Config.KillAura, function(state) Config.KillAura = state end)
 CreateInput(MainTab, "Kill Aura Range (Studs)", "KillAuraRange")
 CreateToggle(MainTab, "Auto Roll Gacha (Cousin)", Config.AutoGacha, function(state) Config.AutoGacha = state end)
 CreateToggle(MainTab, "Remove Gacha Animation", Config.RemoveGachaAnim, function(state) Config.RemoveGachaAnim = state end)
 
--- 2. Boss Tab (Only Spawned Bosses)
 local bossSelectorBtn = CreateSelector(BossTab, "Spawned Bosses", GetSpawnedBosses(), "SelectedBoss")
 CreateButton(BossTab, "Refresh Spawned Bosses", function()
     local newList = GetSpawnedBosses()
@@ -851,7 +814,6 @@ CreateToggle(BossTab, "Boss Kill (Auto Attack)", Config.KillBoss, function(state
     if not state then StopTween() end
 end)
 
--- 3. Teleport Tab (Islands, NPCs, & Player Tweens)
 local islandNames = {}
 for name, _ in pairs(Islands) do table.insert(islandNames, name) end
 CreateSelector(TeleTab, "Select Island", islandNames, "SelectedIsland")
@@ -891,7 +853,6 @@ CreateButton(TeleTab, "Tween to Selected Player", function()
     end
 end)
 
--- 4. Fruits Tab
 CreateToggle(FruitTab, "Fruit ESP (See Fruits)", Config.FruitESP, function(state) Config.FruitESP = state end)
 CreateToggle(FruitTab, "Auto Tween to Spawned Fruit", Config.AutoFruitTween, function(state) Config.AutoFruitTween = state end)
 CreateButton(FruitTab, "Tween to Nearest Fruit NOW", function()
@@ -904,7 +865,6 @@ CreateButton(FruitTab, "Tween to Nearest Fruit NOW", function()
     end
 end)
 
--- 5. Server Information Tab
 local UptimeLabel  = CreateInfoLabel(ServerTab, "Server Uptime: 0m")
 local PlayersLabel = CreateInfoLabel(ServerTab, "Players: 0/12")
 local MoonLabel    = CreateInfoLabel(ServerTab, "Full Moon: 🔴 No")
@@ -934,7 +894,6 @@ task.spawn(function()
     end
 end)
 
--- 6. Misc Tab (FPS, ESP, Island ESP, Speed/Jump)
 CreateButton(MiscTab, "🚀 BOOST FPS NOW", function() ApplyFPSBoost() end)
 CreateToggle(MiscTab, "Island ESP (Names & Distances)", Config.IslandESP, function(state) Config.IslandESP = state end)
 CreateToggle(MiscTab, "Player ESP", Config.PlayerESP, function(state) ToggleESPState(state) end)
