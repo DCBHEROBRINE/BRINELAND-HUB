@@ -1309,6 +1309,28 @@ local function RunUniversalScript()
         end)
     end
 
+    local function TweenToPosition(targetCFrame)
+        local char = LocalPlayer.Character
+        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
+        if not hrp then return end
+        pcall(function()
+            local dist = (hrp.Position - targetCFrame.Position).Magnitude
+            local duration = math.max(0.1, dist / Config.TweenSpeed)
+            local tween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+            tween:Play()
+        end)
+    end
+
+    local function WalkToPosition(targetCFrame)
+        local char = LocalPlayer.Character
+        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+        pcall(function()
+            hum:MoveTo(targetCFrame.Position)
+        end)
+    end
+
     local function GetNearestEnemyTarget(maxRange)
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1793,23 +1815,9 @@ local function RunUniversalScript()
         end)
     end
 
-    -- TELEPORTS TAB CONTROLS
-    local savedPosition = nil
-
+    -- TELEPORTS TAB & CUSTOM WAYPOINT SYSTEM
     CreateButton(TeleportsTab, "Teleport to Spawn (0, 10, 0)", function()
         SafeTeleport(CFrame.new(0, 10, 0))
-    end)
-
-    CreateButton(TeleportsTab, "Save Current Position", function()
-        local char = LocalPlayer.Character
-        if char then
-            local hrp = char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
-            if hrp then savedPosition = hrp.CFrame end
-        end
-    end)
-
-    CreateButton(TeleportsTab, "Teleport to Saved Position", function()
-        if savedPosition then SafeTeleport(savedPosition) end
     end)
 
     CreateButton(TeleportsTab, "Teleport to Random Player", function()
@@ -1826,6 +1834,88 @@ local function RunUniversalScript()
                 SafeTeleport(targetPart.CFrame + Vector3.new(0, 3, 0))
             end
         end
+    end)
+
+    -- Container list for custom TPs
+    local customTpCount = 0
+    CreateButton(TeleportsTab, "+ Set TP (Save Current Position)", function()
+        local char = LocalPlayer.Character
+        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
+        if not hrp then return end
+
+        customTpCount = customTpCount + 1
+        local savedPos = hrp.CFrame
+        local posName = string.format("TP #%d (%.0f, %.0f, %.0f)", customTpCount, savedPos.Position.X, savedPos.Position.Y, savedPos.Position.Z)
+
+        -- Create custom TP card
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(1, -4, 0, 75)
+        card.BackgroundColor3 = Color3.fromRGB(28, 22, 55)
+        card.Parent = TeleportsTab
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -35, 0, 26)
+        label.Position = UDim2.new(0, 8, 0, 4)
+        label.BackgroundTransparency = 1
+        label.Text = "<b>" .. posName .. "</b>"
+        label.TextColor3 = Color3.fromRGB(0, 229, 255)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 10
+        label.RichText = true
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = card
+
+        -- Delete (Cut) Button
+        local deleteBtn = Instance.new("TextButton")
+        deleteBtn.Size = UDim2.fromOffset(24, 24)
+        deleteBtn.Position = UDim2.new(1, -28, 0, 4)
+        deleteBtn.BackgroundColor3 = Color3.fromRGB(220, 35, 70)
+        deleteBtn.Text = "<b>X</b>"
+        deleteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        deleteBtn.Font = Enum.Font.GothamBold
+        deleteBtn.TextSize = 10
+        deleteBtn.RichText = true
+        deleteBtn.Parent = card
+        Instance.new("UICorner", deleteBtn).CornerRadius = UDim.new(0, 4)
+
+        deleteBtn.MouseButton1Click:Connect(function()
+            card:Destroy()
+        end)
+
+        -- Tween Button
+        local tweenBtn = Instance.new("TextButton")
+        tweenBtn.Size = UDim2.new(0.5, -6, 0, 34)
+        tweenBtn.Position = UDim2.new(0, 4, 0, 34)
+        tweenBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 210)
+        tweenBtn.Text = "<b>Tween TP</b>"
+        tweenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tweenBtn.Font = Enum.Font.GothamBold
+        tweenBtn.TextSize = 11
+        tweenBtn.RichText = true
+        tweenBtn.Parent = card
+        Instance.new("UICorner", tweenBtn).CornerRadius = UDim.new(0, 6)
+
+        tweenBtn.MouseButton1Click:Connect(function()
+            TweenToPosition(savedPos)
+        end)
+
+        -- Walk Button
+        local walkBtn = Instance.new("TextButton")
+        walkBtn.Size = UDim2.new(0.5, -6, 0, 34)
+        walkBtn.Position = UDim2.new(0.5, 2, 0, 34)
+        walkBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
+        walkBtn.Text = "<b>Walk TP</b>"
+        walkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        walkBtn.Font = Enum.Font.GothamBold
+        walkBtn.TextSize = 11
+        walkBtn.RichText = true
+        walkBtn.Parent = card
+        Instance.new("UICorner", walkBtn).CornerRadius = UDim.new(0, 6)
+
+        walkBtn.MouseButton1Click:Connect(function()
+            WalkToPosition(savedPos)
+        end)
     end)
 
     -- PLAYER TAB CONTROLS
