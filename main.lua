@@ -1815,30 +1815,10 @@ local function RunUniversalScript()
         end)
     end
 
-    -- TELEPORTS TAB & CUSTOM WAYPOINT SYSTEM
-    CreateButton(TeleportsTab, "Teleport to Spawn (0, 10, 0)", function()
-        SafeTeleport(CFrame.new(0, 10, 0))
-    end)
-
-    CreateButton(TeleportsTab, "Teleport to Random Player", function()
-        local otherPlayers = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and (p.Character:FindFirstChild("HumanoidRootPart") or p.Character.PrimaryPart) then
-                table.insert(otherPlayers, p)
-            end
-        end
-        if #otherPlayers > 0 then
-            local target = otherPlayers[math.random(1, #otherPlayers)]
-            local targetPart = target.Character:FindFirstChild("HumanoidRootPart") or target.Character.PrimaryPart
-            if targetPart then
-                SafeTeleport(targetPart.CFrame + Vector3.new(0, 3, 0))
-            end
-        end
-    end)
-
-    -- Container list for custom TPs
+    -- TELEPORTS TAB & RESTORED SET POSITION SYSTEM
     local customTpCount = 0
-    CreateButton(TeleportsTab, "+ Set TP (Save Current Position)", function()
+
+    CreateButton(TeleportsTab, "Set Position", function()
         local char = LocalPlayer.Character
         local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
         if not hrp then return end
@@ -1849,7 +1829,7 @@ local function RunUniversalScript()
 
         -- Create custom TP card
         local card = Instance.new("Frame")
-        card.Size = UDim2.new(1, -4, 0, 75)
+        card.Size = UDim2.new(1, -4, 0, 80)
         card.BackgroundColor3 = Color3.fromRGB(28, 22, 55)
         card.Parent = TeleportsTab
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
@@ -1866,7 +1846,7 @@ local function RunUniversalScript()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = card
 
-        -- Delete (Cut) Button
+        -- Delete (Cut) Button ('X')
         local deleteBtn = Instance.new("TextButton")
         deleteBtn.Size = UDim2.fromOffset(24, 24)
         deleteBtn.Position = UDim2.new(1, -28, 0, 4)
@@ -1883,29 +1863,29 @@ local function RunUniversalScript()
             card:Destroy()
         end)
 
-        -- Tween Button
-        local tweenBtn = Instance.new("TextButton")
-        tweenBtn.Size = UDim2.new(0.5, -6, 0, 34)
-        tweenBtn.Position = UDim2.new(0, 4, 0, 34)
-        tweenBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 210)
-        tweenBtn.Text = "<b>Tween TP</b>"
-        tweenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tweenBtn.Font = Enum.Font.GothamBold
-        tweenBtn.TextSize = 11
-        tweenBtn.RichText = true
-        tweenBtn.Parent = card
-        Instance.new("UICorner", tweenBtn).CornerRadius = UDim.new(0, 6)
+        -- 1. TP Button (Instant Teleport)
+        local tpBtn = Instance.new("TextButton")
+        tpBtn.Size = UDim2.new(0.32, -4, 0, 36)
+        tpBtn.Position = UDim2.new(0, 4, 0, 36)
+        tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 220)
+        tpBtn.Text = "<b>TP</b>"
+        tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tpBtn.Font = Enum.Font.GothamBold
+        tpBtn.TextSize = 11
+        tpBtn.RichText = true
+        tpBtn.Parent = card
+        Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
 
-        tweenBtn.MouseButton1Click:Connect(function()
-            TweenToPosition(savedPos)
+        tpBtn.MouseButton1Click:Connect(function()
+            SafeTeleport(savedPos)
         end)
 
-        -- Walk Button
+        -- 2. Walk Button (Straight Walk)
         local walkBtn = Instance.new("TextButton")
-        walkBtn.Size = UDim2.new(0.5, -6, 0, 34)
-        walkBtn.Position = UDim2.new(0.5, 2, 0, 34)
+        walkBtn.Size = UDim2.new(0.32, -4, 0, 36)
+        walkBtn.Position = UDim2.new(0.34, 0, 0, 36)
         walkBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
-        walkBtn.Text = "<b>Walk TP</b>"
+        walkBtn.Text = "<b>Walk</b>"
         walkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         walkBtn.Font = Enum.Font.GothamBold
         walkBtn.TextSize = 11
@@ -1915,6 +1895,23 @@ local function RunUniversalScript()
 
         walkBtn.MouseButton1Click:Connect(function()
             WalkToPosition(savedPos)
+        end)
+
+        -- 3. Tween Button (Tween Teleport)
+        local tweenBtn = Instance.new("TextButton")
+        tweenBtn.Size = UDim2.new(0.32, -4, 0, 36)
+        tweenBtn.Position = UDim2.new(0.68, -4, 0, 36)
+        tweenBtn.BackgroundColor3 = Color3.fromRGB(150, 60, 220)
+        tweenBtn.Text = "<b>Tween</b>"
+        tweenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tweenBtn.Font = Enum.Font.GothamBold
+        tweenBtn.TextSize = 11
+        tweenBtn.RichText = true
+        tweenBtn.Parent = card
+        Instance.new("UICorner", tweenBtn).CornerRadius = UDim.new(0, 6)
+
+        tweenBtn.MouseButton1Click:Connect(function()
+            TweenToPosition(savedPos)
         end)
     end)
 
