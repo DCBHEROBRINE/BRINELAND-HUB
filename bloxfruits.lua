@@ -1,61 +1,91 @@
 -- ============================================================
--- BRINELAND BLOX FRUITS AUTO-FARM & SEA UNLOCKER
+-- BRINELAND BLOX FRUITS 1-2800 DYNAMIC AUTO-FARM ENGINE
+-- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- Loaded automatically via main.lua router
 -- ============================================================
 
-local TweenService     = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage= game:GetService("ReplicatedStorage")
-local Workspace        = game:GetService("Workspace")
-local RunService       = game:GetService("RunService")
-local Players          = game:GetService("Players")
-local LocalPlayer      = Players.LocalPlayer
+if not game:IsLoaded() then game.Loaded:Wait() end
 
--- UI Guard
+local Players           = game:GetService("Players")
+local TweenService       = game:GetService("TweenService")
+local VirtualUser        = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage  = game:GetService("ReplicatedStorage")
+local RunService         = game:GetService("RunService")
+local UserInputService   = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- GUI Cleanup
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 if PlayerGui:FindFirstChild("BrinelandBloxFruits") then
     PlayerGui.BrinelandBloxFruits:Destroy()
 end
 
--- Configurations
-local Config = {
-    AutoLevel       = false,
-    AutoSea2        = false,
-    AutoSea3        = false,
-    TweenSpeed      = 280,
-    FastAttack      = true,
-    BringMobs       = true,
-    BringRadius     = 50
-}
+-- Global Control Variables
+getgenv().AutoFarm   = false
+getgenv().FastAttack = true
+getgenv().BringMob   = true
+getgenv().AutoSea2   = false
+getgenv().AutoSea3   = false
+getgenv().TweenSpeed = 325
 
--- Safe Character Get
-local function GetCharacter()
-    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-end
+-- Anti-AFK Kick Protection
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
 
-local function GetHRP()
-    local char = GetCharacter()
-    return char:WaitForChild("HumanoidRootPart", 5) or char.PrimaryPart
-end
-
--- Teleport / Movement Helper
+-- Safe Anti-Cheat Bypass Teleportation Method
 local function TweenTo(targetCFrame)
-    local hrp = GetHRP()
-    if not hrp then return end
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart", 5)
+    if not root then return end
     
-    local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    if dist < 5 then
-        hrp.CFrame = targetCFrame
+    local distance = (root.Position - targetCFrame.Position).Magnitude
+    local speed = getgenv().TweenSpeed or 325
+    local duration = distance / speed
+    
+    if distance < 20 then
+        root.CFrame = targetCFrame
         return
     end
-
-    local duration = math.max(0.1, dist / Config.TweenSpeed)
-    local tween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    
+    local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
     tween:Play()
     tween.Completed:Wait()
 end
 
--- Get Current Level
+-- Weapon Auto-Equip Helper
+local function EquipWeapon()
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not char or not backpack then return end
+    
+    for _, tool in pairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and (tool.ToolTip == "Melee" or tool.ToolTip == "Sword" or tool.ToolTip == "Blox Fruit") then
+            char.Humanoid:EquipTool(tool)
+            break
+        end
+    end
+end
+
+-- Fast Attack Engine Loop
+task.spawn(function()
+    while task.wait(0.05) do
+        pcall(function()
+            if getgenv().FastAttack and getgenv().AutoFarm and LocalPlayer.Character then
+                if LocalPlayer.Character:FindFirstChildOfClass("Tool") then
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+                end
+            end
+        end)
+    end
+end)
+
+-- Level Acquisition Helper
 local function GetLevel()
     local data = LocalPlayer:FindFirstChild("Data")
     if data and data:FindFirstChild("Level") then
@@ -64,195 +94,129 @@ local function GetLevel()
     return 1
 end
 
--- ============================================================
--- QUEST & ISLAND DATA ROUTER (Sea 1, Sea 2, Sea 3)
--- ============================================================
-local function GetQuestData()
-    local level = GetLevel()
-    local placeId = game.PlaceId
-
+-- Dynamic Level & NPC Quest Router (Level 1 - 2800)
+local function GetActiveQuestTarget()
+    local myLevel = GetLevel()
+    local targetQuest, targetMob, npcName
+    
     -- FIRST SEA (Level 1 - 700)
-    if level < 700 then
-        if level >= 1 and level < 15 then
-            local team = LocalPlayer.Team and LocalPlayer.Team.Name or "Pirates"
-            if team == "Marines" then
-                return { QuestName = "MarineQuest", QuestLevel = 1, EnemyName = "Trainee", QuestCFrame = CFrame.new(-2708, 25, 2104), EnemyCFrame = CFrame.new(-2740, 25, 2120) }
-            else
-                return { QuestName = "BanditQuest1", QuestLevel = 1, EnemyName = "Bandit", QuestCFrame = CFrame.new(1059, 16, 1549), EnemyCFrame = CFrame.new(1145, 16, 1630) }
-            end
-        elseif level >= 15 and level < 30 then
-            return { QuestName = "JungleQuest", QuestLevel = 1, EnemyName = "Monkey", QuestCFrame = CFrame.new(-1598, 36, 153), EnemyCFrame = CFrame.new(-1618, 36, 145) }
-        elseif level >= 30 and level < 60 then
-            return { QuestName = "BuggyQuest1", QuestLevel = 1, EnemyName = "Pirate", QuestCFrame = CFrame.new(-1140, 4, 3828), EnemyCFrame = CFrame.new(-1210, 4, 3910) }
-        elseif level >= 60 and level < 90 then
-            return { QuestName = "DesertQuest", QuestLevel = 1, EnemyName = "Desert Bandit", QuestCFrame = CFrame.new(894, 6, 4390), EnemyCFrame = CFrame.new(950, 6, 4450) }
-        elseif level >= 90 and level < 120 then
-            return { QuestName = "SnowQuest", QuestLevel = 1, EnemyName = "Snow Bandit", QuestCFrame = CFrame.new(1385, 87, -1298), EnemyCFrame = CFrame.new(1320, 87, -1350) }
-        elseif level >= 120 and level < 150 then
-            return { QuestName = "MarineTreeQuest", QuestLevel = 1, EnemyName = "Chief Petty Officer", QuestCFrame = CFrame.new(-5030, 20, 4320), EnemyCFrame = CFrame.new(-4920, 20, 4280) }
-        elseif level >= 150 and level < 190 then
-            return { QuestName = "SkyQuest1", QuestLevel = 1, EnemyName = "Sky Bandit", QuestCFrame = CFrame.new(-4840, 718, -2620), EnemyCFrame = CFrame.new(-4980, 718, -2570) }
-        elseif level >= 190 and level < 225 then
-            return { QuestName = "PrisonerQuest", QuestLevel = 1, EnemyName = "Prisoner", QuestCFrame = CFrame.new(530, 1, 470), EnemyCFrame = CFrame.new(480, 1, 520) }
-        elseif level >= 225 and level < 300 then
-            return { QuestName = "ColosseumQuest", QuestLevel = 1, EnemyName = "Toga Warrior", QuestCFrame = CFrame.new(-1580, 7, -2980), EnemyCFrame = CFrame.new(-1700, 7, -3050) }
-        elseif level >= 300 and level < 375 then
-            return { QuestName = "MagmaQuest", QuestLevel = 1, EnemyName = "Military Soldier", QuestCFrame = CFrame.new(-5310, 12, 8510), EnemyCFrame = CFrame.new(-5400, 12, 8580) }
-        elseif level >= 375 and level < 450 then
-            return { QuestName = "FishmanQuest", QuestLevel = 1, EnemyName = "Fishman Warrior", QuestCFrame = CFrame.new(61120, 18, 1560), EnemyCFrame = CFrame.new(61000, 18, 1500) }
-        elseif level >= 450 and level < 625 then
-            return { QuestName = "SkyQuest2", QuestLevel = 1, EnemyName = "God's Guard", QuestCFrame = CFrame.new(-7860, 5545, -380), EnemyCFrame = CFrame.new(-7720, 5545, -420) }
-        elseif level >= 625 and level <= 700 then
-            return { QuestName = "FountainQuest", QuestLevel = 1, EnemyName = "Corporal", QuestCFrame = CFrame.new(5250, 38, 4050), EnemyCFrame = CFrame.new(5120, 38, 4120) }
-        end
+    if myLevel < 10 then 
+        targetQuest = "Bandits"; targetMob = "Bandit"; npcName = "Bandit Quest Giver"
+    elseif myLevel < 15 then 
+        targetQuest = "Monkeys"; targetMob = "Monkey"; npcName = "Monkey Quest Giver"
+    elseif myLevel < 30 then 
+        targetQuest = "Gorillas"; targetMob = "Gorilla"; npcName = "Monkey Quest Giver"
+    elseif myLevel < 75 then 
+        targetQuest = "Pirates"; targetMob = "Pirate"; npcName = "Pirate Village Quest Giver"
+    elseif myLevel < 90 then 
+        targetQuest = "Brutes"; targetMob = "Brute"; npcName = "Pirate Village Quest Giver"
+    elseif myLevel < 120 then 
+        targetQuest = "DesertBandits"; targetMob = "Desert Bandit"; npcName = "Desert Quest Giver"
+    elseif myLevel < 250 then 
+        targetQuest = "SnowBandits"; targetMob = "Snow Bandit"; npcName = "Snow Quest Giver"
+    elseif myLevel < 430 then 
+        targetQuest = "ChiefGally"; targetMob = "Chief Petty Officer"; npcName = "Marineford Quest Giver"
+    elseif myLevel < 700 then 
+        targetQuest = "FishmanCommandos"; targetMob = "Fishman Commando"; npcName = "Underwater Quest Giver"
     
     -- SECOND SEA (Level 700 - 1500)
-    elseif level >= 700 and level < 1500 then
-        if level >= 700 and level < 875 then
-            return { QuestName = "Area1Quest", QuestLevel = 1, EnemyName = "Raider", QuestCFrame = CFrame.new(-425, 73, 1835), EnemyCFrame = CFrame.new(-550, 73, 1750) }
-        elseif level >= 875 and level < 950 then
-            return { QuestName = "Area2Quest", QuestLevel = 1, EnemyName = "Marine Lieutenant", QuestCFrame = CFrame.new(-2440, 73, -3210), EnemyCFrame = CFrame.new(-2560, 73, -3150) }
-        elseif level >= 950 and level < 1000 then
-            return { QuestName = "GraveyardQuest", QuestLevel = 1, EnemyName = "Zombie", QuestCFrame = CFrame.new(-5490, 48, -795), EnemyCFrame = CFrame.new(-5600, 48, -720) }
-        elseif level >= 1000 and level < 1100 then
-            return { QuestName = "SnowMountainQuest", QuestLevel = 1, EnemyName = "Snow Trooper", QuestCFrame = CFrame.new(610, 400, -5370), EnemyCFrame = CFrame.new(500, 400, -5450) }
-        elseif level >= 1100 and level < 1250 then
-            return { QuestName = "IceSideQuest", QuestLevel = 1, EnemyName = "Lab Subordinate", QuestCFrame = CFrame.new(-6060, 15, -4980), EnemyCFrame = CFrame.new(-5950, 15, -5100) }
-        elseif level >= 1250 and level < 1350 then
-            return { QuestName = "ShipQuest1", QuestLevel = 1, EnemyName = "Ship Deckhand", QuestCFrame = CFrame.new(1030, 125, 32900), EnemyCFrame = CFrame.new(1150, 125, 33000) }
-        elseif level >= 1350 and level < 1425 then
-            return { QuestName = "FrostQuest", QuestLevel = 1, EnemyName = "Arctic Warrior", QuestCFrame = CFrame.new(5560, 28, -6200), EnemyCFrame = CFrame.new(5700, 28, -6100) }
-        elseif level >= 1425 and level < 1500 then
-            return { QuestName = "ForgottenQuest", QuestLevel = 1, EnemyName = "Water Fighter", QuestCFrame = CFrame.new(-3050, 230, -10140), EnemyCFrame = CFrame.new(-3180, 230, -10250) }
-        end
-
+    elseif myLevel < 875 then 
+        targetQuest = "Raiders"; targetMob = "Raider"; npcName = "Kingdom of Rose Quest Giver"
+    elseif myLevel < 1100 then 
+        targetQuest = "SwanPirates"; targetMob = "Swan Pirate"; npcName = "Kingdom of Rose Quest Giver"
+    elseif myLevel < 1350 then 
+        targetQuest = "SnowSoldiers"; targetMob = "Snow Soldier"; npcName = "Snow Mountain Quest Giver"
+    elseif myLevel < 1500 then 
+        targetQuest = "WaterCommandos"; targetMob = "Water Commando"; npcName = "Forgotten Island Quest Giver"
+    
     -- THIRD SEA (Level 1500 - 2800)
-    else
-        if level >= 1500 and level < 1575 then
-            return { QuestName = "PortTownQuest", QuestLevel = 1, EnemyName = "Pirate Millionaire", QuestCFrame = CFrame.new(-290, 44, 5580), EnemyCFrame = CFrame.new(-420, 44, 5650) }
-        elseif level >= 1575 and level < 1700 then
-            return { QuestName = "HydraTownQuest", QuestLevel = 1, EnemyName = "Dragon Crew Warrior", QuestCFrame = CFrame.new(5750, 610, -280), EnemyCFrame = CFrame.new(5880, 610, -350) }
-        elseif level >= 1700 and level < 1775 then
-            return { QuestName = "GreatTreeQuest", QuestLevel = 1, EnemyName = "Marine Commodore", QuestCFrame = CFrame.new(2180, 28, -6740), EnemyCFrame = CFrame.new(2300, 28, -6820) }
-        elseif level >= 1775 and level < 1975 then
-            return { QuestName = "TurtleQuest1", QuestLevel = 1, EnemyName = "Fishman Raider", QuestCFrame = CFrame.new(-10480, 330, -8800), EnemyCFrame = CFrame.new(-10600, 330, -8900) }
-        elseif level >= 1975 and level < 2075 then
-            return { QuestName = "HauntedQuest1", QuestLevel = 1, EnemyName = "Reborn Skeleton", QuestCFrame = CFrame.new(-9510, 140, 5530), EnemyCFrame = CFrame.new(-9620, 140, 5600) }
-        elseif level >= 2075 and level < 2450 then
-            return { QuestName = "PeanutQuest", QuestLevel = 1, EnemyName = "Peanut Scout", QuestCFrame = CFrame.new(-2120, 48, -10120), EnemyCFrame = CFrame.new(-2250, 48, -10200) }
-        elseif level >= 2450 and level < 2600 then
-            return { QuestName = "TikiQuest1", QuestLevel = 1, EnemyName = "Isle Outlaw", QuestCFrame = CFrame.new(-16530, 55, 300), EnemyCFrame = CFrame.new(-16680, 55, 420) }
-        else
-            return { QuestName = "SubmergedQuest", QuestLevel = 1, EnemyName = "Deepsea Abomination", QuestCFrame = CFrame.new(-18900, 20, 1200), EnemyCFrame = CFrame.new(-19050, 20, 1300) }
-        end
+    elseif myLevel < 1775 then 
+        targetQuest = "PistolBillionaires"; targetMob = "Pistol Billionaire"; npcName = "Floating Turtle Quest Giver"
+    elseif myLevel < 2000 then 
+        targetQuest = "MythologicalPirates"; targetMob = "Mythological Pirate"; npcName = "Floating Turtle Quest Giver"
+    elseif myLevel < 2200 then 
+        targetQuest = "CookiePirates"; targetMob = "Cookie Pirate"; npcName = "Ice Cream Land Quest Giver"
+    elseif myLevel < 2500 then 
+        targetQuest = "CocoaWarriors"; targetMob = "Cocoa Warrior"; npcName = "Chocolate Land Quest Giver"
+    else 
+        targetQuest = "CandyPirates"; targetMob = "Candy Pirate"; npcName = "Candy Land Quest Giver" 
     end
+    
+    return targetQuest, targetMob, npcName
 end
 
--- ============================================================
--- AUTO ATTACK & MOB BRING
--- ============================================================
-local function AutoAttackTarget(targetMob)
-    local char = GetCharacter()
-    local hrp = GetHRP()
-    if not char or not hrp or not targetMob or not targetMob:FindFirstChild("HumanoidRootPart") then return end
-
-    -- Position hover slightly above mob to dodge ground hits
-    hrp.CFrame = targetMob.HumanoidRootPart.CFrame * CFrame.new(0, 11, 0) * CFrame.Angles(math.rad(-90), 0, 0)
-
-    -- Auto Equip Tool
-    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-        if tool:IsA("Tool") and (tool.ToolTip == "Melee" or tool.ToolTip == "Blox Fruit" or tool.ToolTip == "Sword") then
-            tool.Parent = char
-            break
-        end
-    end
-
-    -- Fast Attack Event Trigger
-    if Config.FastAttack then
-        pcall(function()
-            local combatReg = ReplicatedStorage:FindFirstChild("RigControllerEvent") or ReplicatedStorage:FindFirstChild("Remotes")
-            if combatReg then
-                combatReg.FireServer(combatReg, "weaponAttack")
-            else
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool then tool:Activate() end
-            end
-        end)
-    end
-
-    -- Magnet/Bring nearby mobs
-    if Config.BringMobs then
-        for _, mob in ipairs(Workspace.Enemies:GetChildren()) do
-            if mob.Name == targetMob.Name and mob:FindFirstChild("HumanoidRootPart") and mob ~= targetMob then
-                if (mob.HumanoidRootPart.Position - targetMob.HumanoidRootPart.Position).Magnitude <= Config.BringRadius then
-                    mob.HumanoidRootPart.CFrame = targetMob.HumanoidRootPart.CFrame
-                    mob.HumanoidRootPart.CanCollide = false
-                end
-            end
-        end
-    end
-end
-
--- ============================================================
--- AUTO SEA 2 & SEA 3 UNLOCK ROUTINE
--- ============================================================
-local function CheckAndUnlockSeas()
+-- Auto Sea Unlocking Handler
+local function CheckSeaUnlocks()
     local level = GetLevel()
-
-    -- Auto Sea 2 Progression (Level 700+)
-    if level >= 700 and game.PlaceId == 2753915549 and Config.AutoSea2 then
-        print("[BRINELAND] Starting Sea 2 Unlock Sequence...")
-        -- Talk to Military Detective / Ice Admiral Boss Quest
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("DressrosaQuestProgress", "Detective")
-        task.wait(1)
-        TweenTo(CFrame.new(1385, 87, -1298)) -- Ice Castle Cave
-        -- Trigger teleport to Sea 2 via Experienced Captain
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("TravelDressrosa")
+    if level >= 700 and game.PlaceId == 2753915549 and getgenv().AutoSea2 then
+        pcall(function()
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("DressrosaQuestProgress", "Detective")
+            task.wait(1)
+            TweenTo(CFrame.new(1385, 87, -1298))
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("TravelDressrosa")
+        end)
+        return true
+    elseif level >= 1500 and game.PlaceId == 4442272183 and getgenv().AutoSea3 then
+        pcall(function()
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("ZilphaQuestProgress", "Begin")
+            task.wait(1)
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("TravelZilpha")
+        end)
         return true
     end
-
-    -- Auto Sea 3 Progression (Level 1500+)
-    if level >= 1500 and game.PlaceId == 4442272183 and Config.AutoSea3 then
-        print("[BRINELAND] Starting Sea 3 Unlock Sequence...")
-        -- Talk to King Red Head / Rip_Indra Quest
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("ZilphaQuestProgress", "Begin")
-        task.wait(1)
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("TravelZilpha")
-        return true
-    end
-
     return false
 end
 
--- Main Auto Level Loop
+-- Main Auto-Farm Core System Loop Execution Engine
 task.spawn(function()
-    while task.wait(0.1) do
-        if Config.AutoLevel then
+    while task.wait(0.2) do
+        if getgenv().AutoFarm then
             pcall(function()
-                if CheckAndUnlockSeas() then return end
+                if CheckSeaUnlocks() then return end
 
-                local qData = GetQuestData()
-                local questGui = LocalPlayer.PlayerGui:FindFirstChild("Main") and LocalPlayer.PlayerGui.Main:FindFirstChild("Quest")
-                
-                -- Check if active quest matches expected level quest
-                if not questGui or not questGui.Visible then
-                    TweenTo(qData.QuestCFrame)
-                    task.wait(0.2)
-                    ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", qData.QuestName, qData.QuestLevel)
+                local qName, mName, npcName = GetActiveQuestTarget()
+                local mainGui = LocalPlayer.PlayerGui:FindFirstChild("Main")
+                local hasQuest = mainGui and mainGui:FindFirstChild("Quest") and mainGui.Quest.Visible
+
+                -- If player does NOT have an active quest window open
+                if not hasQuest then
+                    local npc = workspace:FindFirstChild("NPCs") and workspace.NPCs:FindFirstChild(npcName) or workspace:FindFirstChild(npcName)
+                    if npc and npc:FindFirstChild("HumanoidRootPart") then
+                        TweenTo(npc.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3))
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", qName, 1)
+                    end
                 else
-                    -- Search target enemy
+                    -- If active quest accepted, farm target mobs
+                    EquipWeapon()
+                    local enemyFolder = workspace:FindFirstChild("Enemies") and workspace.Enemies:GetChildren() or {}
                     local targetMob = nil
-                    for _, enemy in ipairs(Workspace.Enemies:GetChildren()) do
-                        if enemy.Name == qData.EnemyName and enemy:FindFirstChild("HumanoidRootPart") and enemy:FindFirstChildOfClass("Humanoid").Health > 0 then
+                    
+                    for _, enemy in pairs(enemyFolder) do
+                        if enemy.Name == mName and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
                             targetMob = enemy
                             break
                         end
                     end
-
-                    if targetMob then
-                        AutoAttackTarget(targetMob)
+                    
+                    if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
+                        -- Hover position overhead
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = targetMob.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                        
+                        -- Magnet / Bring Mobs Routine
+                        if getgenv().BringMob then
+                            for _, nearbyEnemy in pairs(workspace.Enemies:GetChildren()) do
+                                if nearbyEnemy.Name == mName and nearbyEnemy:FindFirstChild("HumanoidRootPart") then
+                                    nearbyEnemy.HumanoidRootPart.CFrame = targetMob.HumanoidRootPart.CFrame
+                                    nearbyEnemy.HumanoidRootPart.CanCollide = false
+                                end
+                            end
+                        end
                     else
-                        TweenTo(qData.EnemyCFrame)
+                        -- Teleport to mob spawn anchor if no live mobs found on map
+                        local spawnPoint = workspace:FindFirstChild("_WorldOrigin") and workspace._WorldOrigin:FindFirstChild("EnemySpawns") and workspace._WorldOrigin.EnemySpawns:FindFirstChild(mName)
+                        if spawnPoint then
+                            TweenTo(spawnPoint.CFrame)
+                        end
                     end
                 end
             end)
@@ -261,7 +225,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- GUI BUILDER
+-- GUI INTERFACE BUILDER
 -- ============================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BrinelandBloxFruits"
@@ -269,8 +233,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.fromOffset(320, 290)
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -145)
+MainFrame.Size = UDim2.fromOffset(330, 290)
+MainFrame.Position = UDim2.new(0.5, -165, 0.5, -145)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 28)
 MainFrame.Active = true
 MainFrame.Parent = ScreenGui
@@ -318,7 +282,7 @@ local Layout = Instance.new("UIListLayout")
 Layout.Padding = UDim.new(0, 6)
 Layout.Parent = Container
 
-local function CreateToggle(text, configKey)
+local function CreateToggle(text, globalKey)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, -4, 0, 38)
     frame.BackgroundColor3 = Color3.fromRGB(24, 20, 44)
@@ -340,13 +304,13 @@ local function CreateToggle(text, configKey)
     local toggleBg = Instance.new("Frame")
     toggleBg.Size = UDim2.fromOffset(38, 18)
     toggleBg.Position = UDim2.new(1, -44, 0.5, -9)
-    toggleBg.BackgroundColor3 = Config[configKey] and Color3.fromRGB(0, 229, 255) or Color3.fromRGB(45, 38, 68)
+    toggleBg.BackgroundColor3 = getgenv()[globalKey] and Color3.fromRGB(0, 229, 255) or Color3.fromRGB(45, 38, 68)
     toggleBg.Parent = frame
     Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
 
     local knob = Instance.new("Frame")
     knob.Size = UDim2.fromOffset(14, 14)
-    knob.Position = Config[configKey] and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+    knob.Position = getgenv()[globalKey] and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
     knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     knob.Parent = toggleBg
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
@@ -358,15 +322,15 @@ local function CreateToggle(text, configKey)
     btn.Parent = frame
 
     btn.MouseButton1Click:Connect(function()
-        Config[configKey] = not Config[configKey]
-        local state = Config[configKey]
+        getgenv()[globalKey] = not getgenv()[globalKey]
+        local state = getgenv()[globalKey]
         TweenService:Create(knob, TweenInfo.new(0.18), {Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)}):Play()
         TweenService:Create(toggleBg, TweenInfo.new(0.18), {BackgroundColor3 = state and Color3.fromRGB(0, 229, 255) or Color3.fromRGB(45, 38, 68)}):Play()
     end)
 end
 
-CreateToggle("Auto Farm Level (1 - 2800)", "AutoLevel")
+CreateToggle("Auto Level Farm (1-2800)", "AutoFarm")
+CreateToggle("Fast Attack Mode", "FastAttack")
+CreateToggle("Magnet / Bring Mobs", "BringMob")
 CreateToggle("Auto Unlock Second Sea", "AutoSea2")
 CreateToggle("Auto Unlock Third Sea", "AutoSea3")
-CreateToggle("Fast Attack Speed", "FastAttack")
-CreateToggle("Bring / Magnet Mobs", "BringMobs")
