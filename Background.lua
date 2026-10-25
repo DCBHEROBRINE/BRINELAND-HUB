@@ -10,6 +10,9 @@ function ThemeManager.Apply(parentFrame)
     -- Prevent duplicate backgrounds if applied twice
     if parentFrame:FindFirstChild("HubBackground") then return end
 
+    -- Make the main window transparent so the background image shows through
+    parentFrame.BackgroundTransparency = 1
+
     -- 1. Create Background Image Label
     local bgImage = Instance.new("ImageLabel")
     bgImage.Name = "HubBackground"
