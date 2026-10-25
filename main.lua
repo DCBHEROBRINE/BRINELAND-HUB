@@ -131,11 +131,11 @@ end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- HELPER: LOAD BACKGROUND MODULE FROM GITHUB
+-- HELPER: LOAD BACKGROUND MODULE FROM GITHUB (WITH CACHE-BUSTING)
 -- ============================================================
 local function GetBackgroundTheme()
     local success, themeModule = pcall(function()
-        return loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/Background.lua"))()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/Background.lua?cache=" .. math.random()))()
     end)
     if success and themeModule then
         return themeModule
@@ -460,14 +460,20 @@ local function RunTaxiBoss()
 
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
-    local Gradient = Instance.new("UIGradient")
-    Gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(55, 20, 95)),
-        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(25, 35, 115)),
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(15, 65, 145))
-    })
-    Gradient.Rotation = 45
-    Gradient.Parent = MainFrame
+    -- Automatically Apply Background from Background.lua for Taxi Boss
+    local Theme = GetBackgroundTheme()
+    if Theme and Theme.Apply then
+        Theme.Apply(MainFrame)
+    else
+        local Gradient = Instance.new("UIGradient")
+        Gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(55, 20, 95)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(25, 35, 115)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(15, 65, 145))
+        })
+        Gradient.Rotation = 45
+        Gradient.Parent = MainFrame
+    end
 
     local Stroke = Instance.new("UIStroke")
     Stroke.Color = Color3.fromRGB(150, 85, 255)
@@ -1010,6 +1016,12 @@ local function RunStealAnEgg()
     MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+    -- Automatically Apply Background from Background.lua for Steal An Egg
+    local Theme = GetBackgroundTheme()
+    if Theme and Theme.Apply then
+        Theme.Apply(MainFrame)
+    end
 
     local FrameStroke = Instance.new("UIStroke")
     FrameStroke.Color = Color3.fromRGB(0, 210, 255)
