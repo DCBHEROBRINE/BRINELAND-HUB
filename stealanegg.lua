@@ -1,9 +1,13 @@
--- Steal An Egg Hub V7
+-- Steal An Egg Hub V7 (Enhanced Master Engine Edition)
+if not getgenv then function getgenv() return _G end end
+
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace        = game:GetService("Workspace")
 local RunService       = game:GetService("RunService")
 local Players          = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser      = game:GetService("VirtualUser")
 local LocalPlayer      = Players.LocalPlayer
 
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -11,6 +15,7 @@ if PlayerGui:FindFirstChild("StealAnEggHubV7") then
     PlayerGui.StealAnEggHubV7:Destroy()
 end
 
+-- Configuration
 local Config = {
     AutoSteal            = false,
     StealMethod          = "Tween",
@@ -23,8 +28,65 @@ local Config = {
     AutoUpgradeTreadmill = false,
     AutoUpgradePen       = false,
     EnableSpeed          = false,
-    PlayerSpeed          = 24
+    PlayerSpeed          = 24,
+    AutoReturn           = true,
+    AntiAFK              = true,
+    ScanDelay            = 0.35,
+    InteractDelay        = 0.15,
 }
+
+-- Master State & Cleanup Handles
+local State = {
+    Running     = true,
+    Stealing    = false,
+    HomeBaseCF  = nil,
+    Connections = {},
+}
+
+getgenv().MasterState = State
+
+getgenv().StopMaster = function()
+    State.Running = false
+    State.Stealing = false
+    for _, conn in ipairs(State.Connections) do
+        if conn and conn.Connected then
+            conn:Disconnect()
+        end
+    end
+    table.clear(State.Connections)
+    print("[Steal An Egg Hub] Shutdown complete. All loops and connections disconnected.")
+end
+
+if getgenv().StopMasterOld then
+    getgenv().StopMasterOld()
+end
+getgenv().StopMasterOld = getgenv().StopMaster
+
+-- Character & Remote Utilities
+local function getChar() return LocalPlayer.Character end
+local function getHum()  local c = getChar(); return c and c:FindFirstChildOfClass("Humanoid") end
+local function getRoot() local c = getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
+local function alive()   local h = getHum(); return h and h.Health > 0 and getRoot() ~= nil end
+
+local function getRemote(name)
+    local r = ReplicatedStorage:FindFirstChild(name)
+    if r and (r:IsA("RemoteEvent") or r:IsA("RemoteFunction")) then return r end
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and obj.Name:lower() == name:lower() then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function fireRemote(name, ...)
+    local r = getRemote(name)
+    if not r then return false end
+    return pcall(function()
+        if r:IsA("RemoteEvent") then r:FireServer(...)
+        elseif r:IsA("RemoteFunction") then r:InvokeServer(...) end
+    end)
+end
 
 local function BindClick(button, callback)
     button.Active = true
@@ -59,18 +121,30 @@ local function GetMyPlot()
 end
 
 local function GetSafeZoneCFrame()
+    if State.HomeBaseCF then return State.HomeBaseCF end
     local myPlot = GetMyPlot()
     if myPlot then
         local treadmill = myPlot:FindFirstChild("TreadmillUpgrade") or myPlot:FindFirstChild("Treadmill")
         if treadmill then
             local base = treadmill:FindFirstChildWhichIsA("BasePart", true)
-            if base then return base.CFrame + Vector3.new(0, 4, 0) end
+            if base then 
+                State.HomeBaseCF = base.CFrame + Vector3.new(0, 4, 0)
+                return State.HomeBaseCF 
+            end
         end
         local plotBase = myPlot:FindFirstChildWhichIsA("BasePart")
-        if plotBase then return plotBase.CFrame + Vector3.new(0, 5, 0) end
+        if plotBase then 
+            State.HomeBaseCF = plotBase.CFrame + Vector3.new(0, 5, 0)
+            return State.HomeBaseCF 
+        end
     end
     local char = LocalPlayer.Character
-    return char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame or CFrame.new(0, 10, 0)
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        State.HomeBaseCF = root.CFrame
+        return State.HomeBaseCF
+    end
+    return CFrame.new(0, 10, 0)
 end
 
 local function TouchPart(part)
@@ -129,43 +203,51 @@ local function MoveToTarget(targetCFrame)
     end
 end
 
+-- Deduplicated Egg Scanning Engine
 local function GetEggTargets()
-    local targets = {}
-    local myPlot = GetMyPlot()
+    local root = getRoot()
+    if not root or not alive() then return {} end
 
-    local areaSlots = Workspace:FindFirstChild("AreaEggSlotsClient")
-    if areaSlots then
-        for _, model in ipairs(areaSlots:GetChildren()) do
-            local hitbox = model:FindFirstChild("Hitbox") or model:FindFirstChildWhichIsA("BasePart", true)
-            if hitbox then table.insert(targets, {Part = hitbox, Model = model}) end
-        end
-    end
+    local containers = {
+        Workspace:FindFirstChild("AreaEggSlotsClient", true),
+        Workspace:FindFirstChild("Eggs", true),
+        Workspace:FindFirstChild("SammyEventMap", true),
+        Workspace:FindFirstChild("Plots", true),
+        Workspace
+    }
 
-    local sammyMap = Workspace:FindFirstChild("SammyEventMap")
-    if sammyMap then
-        for _, model in ipairs(sammyMap:GetChildren()) do
-            local hitbox = model:FindFirstChild("Hitbox", true) or model:FindFirstChildWhichIsA("BasePart", true)
-            if hitbox then table.insert(targets, {Part = hitbox, Model = model}) end
-        end
-    end
+    local found = {}
+    local seen = {}
 
-    local plots = Workspace:FindFirstChild("Plots")
-    if plots then
-        for _, plot in ipairs(plots:GetChildren()) do
-            if plot ~= myPlot then
-                for _, obj in ipairs(plot:GetDescendants()) do
-                    if obj:IsA("Model") and obj.Name:lower():find("egg") then
-                        local hitbox = obj:FindFirstChild("Hitbox") or obj:FindFirstChildWhichIsA("BasePart", true)
-                        if hitbox then table.insert(targets, {Part = hitbox, Model = obj}) end
+    for _, container in ipairs(containers) do
+        if container then
+            for _, obj in ipairs(container:GetDescendants()) do
+                if (obj:IsA("Model") or obj:IsA("BasePart")) and not seen[obj] then
+                    seen[obj] = true
+                    local n = obj.Name:lower()
+                    if (n:find("egg") or n:find("telur")) and not n:find("slot") then
+                        local hitbox = obj:IsA("Model") and (obj:FindFirstChild("Hitbox") or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)) or obj
+                        if hitbox and hitbox.Parent then
+                            table.insert(found, {
+                                Instance = obj,
+                                Part = hitbox,
+                                Name = obj.Name,
+                                Distance = (hitbox.Position - root.Position).Magnitude
+                            })
+                        end
                     end
                 end
             end
         end
     end
-    return targets
+
+    table.sort(found, function(a, b) return a.Distance < b.Distance end)
+    return found
 end
 
-RunService.Stepped:Connect(function()
+-- Tracked Connections for Cleanup
+local steppedConn = RunService.Stepped:Connect(function()
+    if not State.Running then return end
     for _, prompt in ipairs(Workspace:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") then prompt.HoldDuration = 0 end
     end
@@ -175,26 +257,47 @@ RunService.Stepped:Connect(function()
         if hum then hum.WalkSpeed = Config.PlayerSpeed end
     end
 end)
+table.insert(State.Connections, steppedConn)
 
+local idledConn = LocalPlayer.Idled:Connect(function()
+    if Config.AntiAFK and State.Running then
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new(0,0))
+    end
+end)
+table.insert(State.Connections, idledConn)
+
+-- Automation Loops
 task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if Config.AutoSteal then
+    GetSafeZoneCFrame()
+    while State.Running do
+        task.wait(Config.ScanDelay)
+        if Config.AutoSteal and not State.Stealing and alive() then
             local targets = GetEggTargets()
-            for _, target in ipairs(targets) do
-                if not Config.AutoSteal then break end
+            if #targets > 0 then
+                local target = targets[1]
                 local hitboxPart = target.Part
                 if hitboxPart and hitboxPart.Parent then
+                    State.Stealing = true
                     MoveToTarget(hitboxPart.CFrame + Vector3.new(0, 2, 0))
                     TouchPart(hitboxPart)
-                    local prompt = target.Model:FindFirstChildWhichIsA("ProximityPrompt", true) or hitboxPart:FindFirstChildWhichIsA("ProximityPrompt")
+                    
+                    local prompt = target.Instance:FindFirstChildWhichIsA("ProximityPrompt", true) or hitboxPart:FindFirstChildWhichIsA("ProximityPrompt")
                     if prompt then
                         prompt.HoldDuration = 0
                         pcall(function() fireproximityprompt(prompt) end)
                     end
-                    task.wait(0.15)
-                    MoveToTarget(GetSafeZoneCFrame())
+                    
+                    fireRemote("StealEgg", target.Name)
+                    fireRemote("StealEgg", target.Instance)
+                    
+                    task.wait(Config.InteractDelay)
+                    
+                    if Config.AutoReturn and State.Running and alive() then
+                        MoveToTarget(GetSafeZoneCFrame())
+                    end
                     task.wait(0.2)
+                    State.Stealing = false
                 end
             end
         end
@@ -203,6 +306,7 @@ end)
 
 task.spawn(function()
     while task.wait(0.08) do
+        if not State.Running then break end
         if Config.AutoHit then
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -228,6 +332,7 @@ end)
 
 task.spawn(function()
     while task.wait(0.25) do
+        if not State.Running then break end
         if Config.AutoPlaceEgg then
             local char = LocalPlayer.Character
             local backpack = LocalPlayer:FindFirstChild("Backpack")
@@ -254,6 +359,7 @@ task.spawn(function()
                         MoveToTarget(GetSafeZoneCFrame())
                         task.wait(0.1)
                         eggTool:Activate()
+                        fireRemote("PlaceEgg")
                         for _, desc in ipairs(myPlot:GetDescendants()) do
                             if desc:IsA("ProximityPrompt") then
                                 desc.HoldDuration = 0
@@ -271,7 +377,10 @@ end)
 
 task.spawn(function()
     while task.wait(0.25) do
+        if not State.Running then break end
         if Config.AutoHatch then
+            fireRemote("HatchEgg")
+            fireRemote("HatchEgg", "EquipBest")
             for _, descendant in ipairs(PlayerGui:GetDescendants()) do
                 if descendant:IsA("TextButton") or descendant:IsA("ImageButton") then
                     local name = descendant.Name:lower()
@@ -300,9 +409,12 @@ end)
 
 task.spawn(function()
     while task.wait(0.3) do
+        if not State.Running then break end
         local myPlot = GetMyPlot()
         if myPlot then
             if Config.AutoUpgradeTreadmill then
+                fireRemote("Treadmill")
+                for tier = 1, 5 do fireRemote("UpgradeTreadmill", tier) end
                 local treadmillModel = myPlot:FindFirstChild("TreadmillUpgrade") or myPlot:FindFirstChild("Treadmill")
                 if treadmillModel then
                     for _, part in ipairs(treadmillModel:GetDescendants()) do
@@ -312,6 +424,7 @@ task.spawn(function()
                 end
             end
             if Config.AutoUpgradePen then
+                fireRemote("UpgradeBase")
                 local penModel = myPlot:FindFirstChild("PlotUpgrade") or myPlot:FindFirstChild("PenUpgrade") or myPlot:FindFirstChild("Plot")
                 if penModel then
                     for _, part in ipairs(penModel:GetDescendants()) do
@@ -404,7 +517,10 @@ CloseBtn.TextSize = 13
 CloseBtn.Parent = TopBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
-BindClick(CloseBtn, function() SetGuiState(false) end)
+BindClick(CloseBtn, function() 
+    if getgenv().StopMaster then getgenv().StopMaster() end
+    SetGuiState(false) 
+end)
 
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -12, 0, 32)
