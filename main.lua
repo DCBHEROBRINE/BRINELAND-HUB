@@ -1280,6 +1280,7 @@ local function RunUniversalScript()
     local UserInputService = game:GetService("UserInputService")
     local Workspace        = game:GetService("Workspace")
     local RunService       = game:GetService("RunService")
+    local Lighting         = game:GetService("Lighting")
     local Players          = game:GetService("Players")
     local LocalPlayer      = Players.LocalPlayer
 
@@ -1295,6 +1296,7 @@ local function RunUniversalScript()
         FlySpeed     = 50,
         Noclip       = false,
         PlayerESP    = false,
+        CleanVision  = false,
         AutoAim      = false,
         AutoAimRange = 60,
         Gravity      = 196.2,
@@ -1527,6 +1529,32 @@ local function RunUniversalScript()
         end
     end
 
+    local function ToggleCleanVision(state)
+        Config.CleanVision = state
+        pcall(function()
+            if state then
+                Lighting.Brightness = 2
+                Lighting.ClockTime = 14
+                Lighting.GlobalShadows = false
+                Lighting.FogEnd = 100000
+                for _, desc in ipairs(Lighting:GetDescendants()) do
+                    if desc:IsA("Atmosphere") or desc:IsA("PostEffect") or desc:IsA("Sky") then
+                        desc.Enabled = false
+                    end
+                end
+            else
+                Lighting.Brightness = 1
+                Lighting.GlobalShadows = true
+                Lighting.FogEnd = 10000
+                for _, desc in ipairs(Lighting:GetDescendants()) do
+                    if desc:IsA("Atmosphere") or desc:IsA("PostEffect") or desc:IsA("Sky") then
+                        desc.Enabled = true
+                    end
+                end
+            end
+        end)
+    end
+
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "BrinelandUniversalHub"
     ScreenGui.ResetOnSpawn = false
@@ -1650,7 +1678,7 @@ local function RunUniversalScript()
     end
 
     local TeleportsTab = CreateTab("Teleports")
-    local PlayersTab   = CreateTab("Players")
+    local PlayersTab   = CreateTab("Player")   -- Sketch requested name
     local PlayerTab    = CreateTab("Cheats")
     local VisualsTab   = CreateTab("Visuals")
 
@@ -1833,9 +1861,8 @@ local function RunUniversalScript()
         end)
     end
 
-    -- TELEPORTS TAB & RESTORED SET POSITION SYSTEM
+    -- TELEPORTS TAB
     local customTpCount = 0
-
     CreateButton(TeleportsTab, "Set Position", function()
         local char = LocalPlayer.Character
         local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
@@ -1845,7 +1872,6 @@ local function RunUniversalScript()
         local savedPos = hrp.CFrame
         local posName = string.format("TP #%d (%.0f, %.0f, %.0f)", customTpCount, savedPos.Position.X, savedPos.Position.Y, savedPos.Position.Z)
 
-        -- Create custom TP card
         local card = Instance.new("Frame")
         card.Size = UDim2.new(1, -4, 0, 80)
         card.BackgroundColor3 = Color3.fromRGB(28, 22, 55)
@@ -1865,7 +1891,6 @@ local function RunUniversalScript()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = card
 
-        -- Delete Button ('X')
         local deleteBtn = Instance.new("TextButton")
         deleteBtn.Size = UDim2.fromOffset(24, 24)
         deleteBtn.Position = UDim2.new(1, -28, 0, 4)
@@ -1877,12 +1902,8 @@ local function RunUniversalScript()
         deleteBtn.RichText = true
         deleteBtn.Parent = card
         Instance.new("UICorner", deleteBtn).CornerRadius = UDim.new(0, 4)
+        deleteBtn.MouseButton1Click:Connect(function() card:Destroy() end)
 
-        deleteBtn.MouseButton1Click:Connect(function()
-            card:Destroy()
-        end)
-
-        -- 1. TP Button (Instant Teleport)
         local tpBtn = Instance.new("TextButton")
         tpBtn.Size = UDim2.new(0.32, -4, 0, 36)
         tpBtn.Position = UDim2.new(0, 4, 0, 36)
@@ -1894,12 +1915,8 @@ local function RunUniversalScript()
         tpBtn.RichText = true
         tpBtn.Parent = card
         Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+        tpBtn.MouseButton1Click:Connect(function() SafeTeleport(savedPos) end)
 
-        tpBtn.MouseButton1Click:Connect(function()
-            SafeTeleport(savedPos)
-        end)
-
-        -- 2. Walk Button (Straight Walk)
         local walkBtn = Instance.new("TextButton")
         walkBtn.Size = UDim2.new(0.32, -4, 0, 36)
         walkBtn.Position = UDim2.new(0.34, 0, 0, 36)
@@ -1911,12 +1928,8 @@ local function RunUniversalScript()
         walkBtn.RichText = true
         walkBtn.Parent = card
         Instance.new("UICorner", walkBtn).CornerRadius = UDim.new(0, 6)
+        walkBtn.MouseButton1Click:Connect(function() WalkToPosition(savedPos) end)
 
-        walkBtn.MouseButton1Click:Connect(function()
-            WalkToPosition(savedPos)
-        end)
-
-        -- 3. Tween Button (Tween Teleport)
         local tweenBtn = Instance.new("TextButton")
         tweenBtn.Size = UDim2.new(0.32, -4, 0, 36)
         tweenBtn.Position = UDim2.new(0.68, -4, 0, 36)
@@ -1928,45 +1941,45 @@ local function RunUniversalScript()
         tweenBtn.RichText = true
         tweenBtn.Parent = card
         Instance.new("UICorner", tweenBtn).CornerRadius = UDim.new(0, 6)
-
-        tweenBtn.MouseButton1Click:Connect(function()
-            TweenToPosition(savedPos)
-        end)
+        tweenBtn.MouseButton1Click:Connect(function() TweenToPosition(savedPos) end)
     end)
 
-    -- PLAYERS TAB (TELEPORT TO PLAYER / TWEEN TO PLAYER)
+    -- PLAYERS TAB (MATCHING YOUR SKETCH LAYOUT)
     local selectedTarget = nil
 
-    local targetDisplay = Instance.new("TextLabel")
-    targetDisplay.Size = UDim2.new(1, -4, 0, 34)
-    targetDisplay.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
-    targetDisplay.BackgroundTransparency = 0.25
-    targetDisplay.Text = "<b>Selected Target: <font color=\"#00E5FF\">None</font></b>"
-    targetDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
-    targetDisplay.Font = Enum.Font.GothamBold
-    targetDisplay.TextSize = 11
-    targetDisplay.RichText = true
-    targetDisplay.Parent = PlayersTab
-    Instance.new("UICorner", targetDisplay).CornerRadius = UDim.new(0, 6)
+    -- 1. Dropdown / Selected Player Display Button (Top Corner Selector)
+    local selectorBtn = Instance.new("TextButton")
+    selectorBtn.Size = UDim2.new(1, -4, 0, 38)
+    selectorBtn.BackgroundColor3 = Color3.fromRGB(28, 22, 55)
+    selectorBtn.BackgroundTransparency = 0.25
+    selectorBtn.Text = "<b>Selected Player: <font color=\"#00E5FF\">None (Click to choose)</font></b>"
+    selectorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selectorBtn.Font = Enum.Font.GothamBold
+    selectorBtn.TextSize = 11
+    selectorBtn.RichText = true
+    selectorBtn.Parent = PlayersTab
+    Instance.new("UICorner", selectorBtn).CornerRadius = UDim.new(0, 6)
 
-    local playerListContainer = Instance.new("ScrollingFrame")
-    playerListContainer.Size = UDim2.new(1, -4, 0, 180)
-    playerListContainer.BackgroundColor3 = Color3.fromRGB(18, 14, 35)
-    playerListContainer.BackgroundTransparency = 0.4
-    playerListContainer.ScrollBarThickness = 3
-    playerListContainer.Parent = PlayersTab
-    Instance.new("UICorner", playerListContainer).CornerRadius = UDim.new(0, 6)
+    -- Player List Dropdown Container (Hidden by default)
+    local dropdownContainer = Instance.new("ScrollingFrame")
+    dropdownContainer.Size = UDim2.new(1, -4, 0, 140)
+    dropdownContainer.BackgroundColor3 = Color3.fromRGB(18, 14, 35)
+    dropdownContainer.BackgroundTransparency = 0.3
+    dropdownContainer.ScrollBarThickness = 3
+    dropdownContainer.Visible = false
+    dropdownContainer.Parent = PlayersTab
+    Instance.new("UICorner", dropdownContainer).CornerRadius = UDim.new(0, 6)
 
-    local playerListLayout = Instance.new("UIListLayout")
-    playerListLayout.Padding = UDim.new(0, 4)
-    playerListLayout.Parent = playerListContainer
+    local dropLayout = Instance.new("UIListLayout")
+    dropLayout.Padding = UDim.new(0, 4)
+    dropLayout.Parent = dropdownContainer
 
-    playerListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        playerListContainer.CanvasSize = UDim2.new(0, 0, 0, playerListLayout.AbsoluteContentSize.Y + 8)
+    dropLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        dropdownContainer.CanvasSize = UDim2.new(0, 0, 0, dropLayout.AbsoluteContentSize.Y + 8)
     end)
 
-    local function RefreshPlayerList()
-        for _, child in ipairs(playerListContainer:GetChildren()) do
+    local function RefreshPlayerDropdown()
+        for _, child in ipairs(dropdownContainer:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
 
@@ -1974,46 +1987,99 @@ local function RunUniversalScript()
             if plr ~= LocalPlayer then
                 local pBtn = Instance.new("TextButton")
                 pBtn.Size = UDim2.new(1, -6, 0, 32)
-                pBtn.BackgroundColor3 = Color3.fromRGB(30, 24, 60)
+                pBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
                 pBtn.Text = "<b>" .. plr.DisplayName .. " (@" .. plr.Name .. ")</b>"
                 pBtn.TextColor3 = Color3.fromRGB(220, 220, 240)
                 pBtn.Font = Enum.Font.GothamBold
                 pBtn.TextSize = 10
                 pBtn.RichText = true
-                pBtn.Parent = playerListContainer
+                pBtn.Parent = dropdownContainer
                 Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
 
                 pBtn.MouseButton1Click:Connect(function()
                     selectedTarget = plr
-                    targetDisplay.Text = "<b>Selected Target: <font color=\"#00E5FF\">" .. plr.Name .. "</font></b>"
+                    selectorBtn.Text = "<b>Selected Player: <font color=\"#00E5FF\">" .. plr.Name .. "</font></b>"
+                    dropdownContainer.Visible = false
                 end)
             end
         end
     end
 
-    RefreshPlayerList()
-    Players.PlayerAdded:Connect(RefreshPlayerList)
-    Players.PlayerRemoving:Connect(RefreshPlayerList)
+    RefreshPlayerDropdown()
+    Players.PlayerAdded:Connect(RefreshPlayerDropdown)
+    Players.PlayerRemoving:Connect(RefreshPlayerDropdown)
 
-    CreateButton(PlayersTab, "Teleport to Player (Instant)", function()
+    selectorBtn.MouseButton1Click:Connect(function()
+        dropdownContainer.Visible = not dropdownContainer.Visible
+        RefreshPlayerDropdown()
+    end)
+
+    -- 2. Action Buttons Frame (TP, Walk, Tween layout exactly like your sketch)
+    local actionCard = Instance.new("Frame")
+    actionCard.Size = UDim2.new(1, -4, 0, 50)
+    actionCard.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+    actionCard.BackgroundTransparency = 0.25
+    actionCard.Parent = PlayersTab
+    Instance.new("UICorner", actionCard).CornerRadius = UDim.new(0, 6)
+
+    local tpBtn = Instance.new("TextButton")
+    tpBtn.Size = UDim2.new(0.32, -4, 1, -8)
+    tpBtn.Position = UDim2.new(0, 4, 0, 4)
+    tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 220)
+    tpBtn.Text = "<b>Tp</b>"
+    tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpBtn.Font = Enum.Font.GothamBold
+    tpBtn.TextSize = 11
+    tpBtn.RichText = true
+    tpBtn.Parent = actionCard
+    Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+
+    tpBtn.MouseButton1Click:Connect(function()
         if selectedTarget and selectedTarget.Character then
             local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart") or selectedTarget.Character.PrimaryPart
-            if targetRoot then
-                SafeTeleport(targetRoot.CFrame + Vector3.new(0, 3, 0))
-            end
+            if targetRoot then SafeTeleport(targetRoot.CFrame + Vector3.new(0, 3, 0)) end
         end
     end)
 
-    CreateButton(PlayersTab, "Tween to Player (Smooth)", function()
+    local walkBtn = Instance.new("TextButton")
+    walkBtn.Size = UDim2.new(0.32, -4, 1, -8)
+    walkBtn.Position = UDim2.new(0.34, 0, 0, 4)
+    walkBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
+    walkBtn.Text = "<b>Walk</b>"
+    walkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    walkBtn.Font = Enum.Font.GothamBold
+    walkBtn.TextSize = 11
+    walkBtn.RichText = true
+    walkBtn.Parent = actionCard
+    Instance.new("UICorner", walkBtn).CornerRadius = UDim.new(0, 6)
+
+    walkBtn.MouseButton1Click:Connect(function()
         if selectedTarget and selectedTarget.Character then
             local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart") or selectedTarget.Character.PrimaryPart
-            if targetRoot then
-                TweenToPosition(targetRoot.CFrame + Vector3.new(0, 3, 0))
-            end
+            if targetRoot then WalkToPosition(targetRoot.CFrame + Vector3.new(0, 3, 0)) end
         end
     end)
 
-    -- PLAYER TAB CONTROLS
+    local tweenBtn = Instance.new("TextButton")
+    tweenBtn.Size = UDim2.new(0.32, -4, 1, -8)
+    tweenBtn.Position = UDim2.new(0.68, -4, 0, 4)
+    tweenBtn.BackgroundColor3 = Color3.fromRGB(150, 60, 220)
+    tweenBtn.Text = "<b>Tween</b>"
+    tweenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tweenBtn.Font = Enum.Font.GothamBold
+    tweenBtn.TextSize = 11
+    tweenBtn.RichText = true
+    tweenBtn.Parent = actionCard
+    Instance.new("UICorner", tweenBtn).CornerRadius = UDim.new(0, 6)
+
+    tweenBtn.MouseButton1Click:Connect(function()
+        if selectedTarget and selectedTarget.Character then
+            local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart") or selectedTarget.Character.PrimaryPart
+            if targetRoot then TweenToPosition(targetRoot.CFrame + Vector3.new(0, 3, 0)) end
+        end
+    end)
+
+    -- CHEATS TAB CONTROLS
     CreateToggle(PlayerTab, "Enable Auto Aim (Lock)", function(state) Config.AutoAim = state end)
     CreateSlider(PlayerTab, "Auto Aim Lock Range", 10, 200, Config.AutoAimRange, true, function(val) Config.AutoAimRange = val end)
     CreateToggle(PlayerTab, "Enable WalkSpeed", function(state)
@@ -2034,6 +2100,7 @@ local function RunUniversalScript()
 
     -- VISUALS TAB CONTROLS
     CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
+    CreateToggle(VisualsTab, "Clean Vision (Fullbright & No Fog)", function(state) ToggleCleanVision(state) end)
 end
 
 -- ============================================================
@@ -2057,6 +2124,6 @@ elseif BLOX_FRUITS_IDS[PlaceId] or nameLower:find("blox fruit") then
     print("[BRINELAND] Detected Blox Fruits. Loading bloxfruits.lua...")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bloxfruits.lua"))()
 else
-    print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
+    print("[BRINELAND] Unrecognized game: " + gameName + " (PlaceId: " + tostring(PlaceId) + "). Running Universal Hub...")
     RunUniversalScript()
 end
