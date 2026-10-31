@@ -131,45 +131,6 @@ end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- BUILT-IN BACKGROUND MANAGER (NO EXTERNAL FILE NEEDED)
--- ============================================================
-local ThemeManager = {}
-ThemeManager.BackgroundId = "rbxassetid://135283494832557"
-
-function ThemeManager.Apply(parentFrame)
-    if parentFrame:FindFirstChild("HubBackground") then return end
-
-    -- Make main window transparent so background shows through
-    parentFrame.BackgroundTransparency = 1
-
-    -- 1. Create Background Image Label
-    local bgImage = Instance.new("ImageLabel")
-    bgImage.Name = "HubBackground"
-    bgImage.Size = UDim2.new(1, 0, 1, 0)
-    bgImage.Position = UDim2.new(0, 0, 0, 0)
-    bgImage.BackgroundTransparency = 1
-    bgImage.Image = ThemeManager.BackgroundId
-    bgImage.ScaleType = Enum.ScaleType.Crop
-    bgImage.ZIndex = 0
-    bgImage.Parent = parentFrame
-
-    -- 2. Dark Overlay for readability
-    local overlay = Instance.new("Frame")
-    overlay.Size = UDim2.new(1, 0, 1, 0)
-    overlay.BackgroundColor3 = Color3.fromRGB(12, 10, 22)
-    overlay.BackgroundTransparency = 0.42
-    overlay.ZIndex = 1
-    overlay.Parent = bgImage
-    
-    -- 3. Push UI elements above background layer
-    for _, child in pairs(parentFrame:GetChildren()) do
-        if child ~= bgImage and child:IsA("GuiObject") then
-            child.ZIndex = math.max(2, child.ZIndex)
-        end
-    end
-end
-
--- ============================================================
 -- BRINELAND CUSTOM UI GATEWAY (PLATOBOOST INTEGRATED)
 -- ============================================================
 local Players = game:GetService("Players")
@@ -199,14 +160,12 @@ local function VerifyAndLoadHub()
     local MainFrame = Instance.new("Frame")
     MainFrame.Size = UDim2.fromOffset(380, 260)
     MainFrame.Position = UDim2.new(0.5, -190, 0.5, -130)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(14, 10, 25)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(14, 11, 25)
+    MainFrame.BackgroundTransparency = 0.18 -- Transparent Glass Look
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Parent = ScreenGui
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-
-    -- Apply Built-in Background
-    ThemeManager.Apply(MainFrame)
 
     local FrameStroke = Instance.new("UIStroke")
     FrameStroke.Color = Color3.fromRGB(0, 229, 255)
@@ -229,7 +188,8 @@ local function VerifyAndLoadHub()
     KeyInput.PlaceholderText = "Paste your key here..."
     KeyInput.Text = ""
     KeyInput.TextColor3 = Color3.fromRGB(0, 229, 255)
-    KeyInput.BackgroundColor3 = Color3.fromRGB(22, 16, 40)
+    KeyInput.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+    KeyInput.BackgroundTransparency = 0.25
     KeyInput.TextSize = 12
     KeyInput.Font = Enum.Font.GothamBold
     KeyInput.Parent = MainFrame
@@ -239,6 +199,7 @@ local function VerifyAndLoadHub()
     WorkInkBtn.Size = UDim2.new(0.9, 0, 0, 35)
     WorkInkBtn.Position = UDim2.new(0.05, 0, 0, 98)
     WorkInkBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 220)
+    WorkInkBtn.BackgroundTransparency = 0.15
     WorkInkBtn.Text = "<b>GET KEY (WORK.INK)</b>"
     WorkInkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     WorkInkBtn.TextSize = 11
@@ -251,6 +212,7 @@ local function VerifyAndLoadHub()
     SubmitBtn.Size = UDim2.new(0.43, 0, 0, 38)
     SubmitBtn.Position = UDim2.new(0.05, 0, 0, 142)
     SubmitBtn.BackgroundColor3 = Color3.fromRGB(45, 180, 80)
+    SubmitBtn.BackgroundTransparency = 0.15
     SubmitBtn.Text = "<b>VERIFY KEY</b>"
     SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     SubmitBtn.TextSize = 12
@@ -263,6 +225,7 @@ local function VerifyAndLoadHub()
     DiscordBtn.Size = UDim2.new(0.43, 0, 0, 38)
     DiscordBtn.Position = UDim2.new(0.52, 0, 0, 142)
     DiscordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    DiscordBtn.BackgroundTransparency = 0.15
     DiscordBtn.Text = "<b>COPY DISCORD</b>"
     DiscordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     DiscordBtn.TextSize = 11
@@ -475,16 +438,14 @@ local function RunTaxiBoss()
     local MainFrame = Instance.new("Frame")
     MainFrame.Size = UDim2.fromOffset(340, 320)
     MainFrame.Position = UDim2.new(0.5, -170, 0.5, -160)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(14, 11, 25)
+    MainFrame.BackgroundTransparency = 0.18 -- Transparent Glass Look
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
 
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-
-    -- Apply Built-in Background for Taxi Boss
-    ThemeManager.Apply(MainFrame)
 
     local Stroke = Instance.new("UIStroke")
     Stroke.Color = Color3.fromRGB(150, 85, 255)
@@ -493,8 +454,8 @@ local function RunTaxiBoss()
 
     local TopBar = Instance.new("Frame")
     TopBar.Size = UDim2.new(1, 0, 0, 40)
-    TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
-    TopBar.BackgroundTransparency = 0.3
+    TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
+    TopBar.BackgroundTransparency = 0.25
     TopBar.Parent = MainFrame
     Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 10)
 
@@ -579,6 +540,7 @@ local function RunTaxiBoss()
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 40)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        frame.BackgroundTransparency = 0.25
         frame.Parent = Container
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
@@ -627,6 +589,7 @@ local function RunTaxiBoss()
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 40)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        frame.BackgroundTransparency = 0.25
         frame.Parent = Container
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
@@ -1004,6 +967,7 @@ local function RunStealAnEgg()
     OpenToggleBtn.Size = UDim2.fromOffset(50, 50)
     OpenToggleBtn.Position = UDim2.new(0, 15, 0.5, -25)
     OpenToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 240)
+    OpenToggleBtn.BackgroundTransparency = 0.15
     OpenToggleBtn.Text = "<b>HUB</b>"
     OpenToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     OpenToggleBtn.Font = Enum.Font.GothamBold
@@ -1022,14 +986,12 @@ local function RunStealAnEgg()
     MainFrame.Size = UDim2.fromOffset(360, 430)
     MainFrame.Position = UDim2.new(0.5, -180, 0.5, -215)
     MainFrame.BackgroundColor3 = Color3.fromRGB(14, 12, 26)
+    MainFrame.BackgroundTransparency = 0.18 -- Transparent Glass Look
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-
-    -- Apply Built-in Background for Steal An Egg
-    ThemeManager.Apply(MainFrame)
 
     local FrameStroke = Instance.new("UIStroke")
     FrameStroke.Color = Color3.fromRGB(0, 210, 255)
@@ -1054,6 +1016,7 @@ local function RunStealAnEgg()
     local TopBar = Instance.new("Frame")
     TopBar.Size = UDim2.new(1, 0, 0, 40)
     TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
+    TopBar.BackgroundTransparency = 0.25
     TopBar.Parent = MainFrame
 
     local Title = Instance.new("TextLabel")
@@ -1098,6 +1061,7 @@ local function RunStealAnEgg()
         local tabBtn = Instance.new("TextButton")
         tabBtn.Size = UDim2.new(0.24, 0, 1, 0)
         tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
+        tabBtn.BackgroundTransparency = 0.3
         tabBtn.Text = "<b>" .. tabName .. "</b>"
         tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
         tabBtn.Font = Enum.Font.GothamBold
@@ -1166,6 +1130,7 @@ local function RunStealAnEgg()
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 38)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 38)
+        frame.BackgroundTransparency = 0.25
         frame.Parent = parent
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
@@ -1213,6 +1178,7 @@ local function RunStealAnEgg()
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 38)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 38)
+        frame.BackgroundTransparency = 0.25
         frame.Parent = parent
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
@@ -1256,6 +1222,7 @@ local function RunStealAnEgg()
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 38)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 38)
+        frame.BackgroundTransparency = 0.25
         frame.Parent = parent
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
@@ -1566,21 +1533,25 @@ local function RunUniversalScript()
     ScreenGui.Parent = PlayerGui
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(350, 440)
-    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -220)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 28)
+    MainFrame.Size = UDim2.fromOffset(360, 440)
+    MainFrame.Position = UDim2.new(0.5, -180, 0.5, -220)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(14, 11, 25)
+    MainFrame.BackgroundTransparency = 0.18 -- Transparent Glass Look
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
-    -- Apply Built-in Background for Universal Hub
-    ThemeManager.Apply(MainFrame)
+    local FrameStroke = Instance.new("UIStroke")
+    FrameStroke.Color = Color3.fromRGB(0, 229, 255)
+    FrameStroke.Thickness = 1.5
+    FrameStroke.Parent = MainFrame
 
     local TopBar = Instance.new("Frame")
     TopBar.Size = UDim2.new(1, 0, 0, 40)
-    TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
+    TopBar.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
+    TopBar.BackgroundTransparency = 0.25
     TopBar.Parent = MainFrame
     Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 10)
 
@@ -1628,18 +1599,19 @@ local function RunUniversalScript()
 
     local TabLayout = Instance.new("UIListLayout")
     TabLayout.FillDirection = Enum.FillDirection.Horizontal
-    TabLayout.Padding = UDim.new(0, 4)
+    TabLayout.Padding = UDim.new(0, 3)
     TabLayout.Parent = TabBar
 
     local TabFrames = {}
     local function CreateTab(tabName)
         local tabBtn = Instance.new("TextButton")
-        tabBtn.Size = UDim2.new(0.32, 0, 1, 0)
+        tabBtn.Size = UDim2.new(0.24, 0, 1, 0)
         tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
+        tabBtn.BackgroundTransparency = 0.3
         tabBtn.Text = "<b>" .. tabName .. "</b>"
         tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
         tabBtn.Font = Enum.Font.GothamBold
-        tabBtn.TextSize = 10
+        tabBtn.TextSize = 9.5
         tabBtn.RichText = true
         tabBtn.Parent = TabBar
         Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
@@ -1678,7 +1650,8 @@ local function RunUniversalScript()
     end
 
     local TeleportsTab = CreateTab("Teleports")
-    local PlayerTab    = CreateTab("Player Cheats")
+    local PlayersTab   = CreateTab("Players")
+    local PlayerTab    = CreateTab("Cheats")
     local VisualsTab   = CreateTab("Visuals")
 
     TabFrames["Teleports"].Container.Visible = true
@@ -1691,10 +1664,10 @@ local function RunUniversalScript()
         if isMinimized then
             for _, data in pairs(TabFrames) do data.Container.Visible = false end
             TabBar.Visible = false
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(350, 40)}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(360, 40)}):Play()
             MinimizeBtn.Text = "<b>+</b>"
         else
-            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(350, 440)}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(0.25), {Size = UDim2.fromOffset(360, 440)}):Play()
             task.wait(0.15)
             TabBar.Visible = true
             for _, data in pairs(TabFrames) do
@@ -1724,6 +1697,7 @@ local function RunUniversalScript()
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 40)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        frame.BackgroundTransparency = 0.25
         frame.Parent = parentContainer
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
@@ -1744,6 +1718,7 @@ local function RunUniversalScript()
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 40)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        frame.BackgroundTransparency = 0.25
         frame.Parent = parentContainer
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
@@ -1792,6 +1767,7 @@ local function RunUniversalScript()
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -4, 0, 48)
         frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        frame.BackgroundTransparency = 0.25
         frame.Parent = parentContainer
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
@@ -1873,6 +1849,7 @@ local function RunUniversalScript()
         local card = Instance.new("Frame")
         card.Size = UDim2.new(1, -4, 0, 80)
         card.BackgroundColor3 = Color3.fromRGB(28, 22, 55)
+        card.BackgroundTransparency = 0.25
         card.Parent = TeleportsTab
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
 
@@ -1888,7 +1865,7 @@ local function RunUniversalScript()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = card
 
-        -- Delete (Cut) Button ('X')
+        -- Delete Button ('X')
         local deleteBtn = Instance.new("TextButton")
         deleteBtn.Size = UDim2.fromOffset(24, 24)
         deleteBtn.Position = UDim2.new(1, -28, 0, 4)
@@ -1955,6 +1932,85 @@ local function RunUniversalScript()
         tweenBtn.MouseButton1Click:Connect(function()
             TweenToPosition(savedPos)
         end)
+    end)
+
+    -- PLAYERS TAB (TELEPORT TO PLAYER / TWEEN TO PLAYER)
+    local selectedTarget = nil
+
+    local targetDisplay = Instance.new("TextLabel")
+    targetDisplay.Size = UDim2.new(1, -4, 0, 34)
+    targetDisplay.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+    targetDisplay.BackgroundTransparency = 0.25
+    targetDisplay.Text = "<b>Selected Target: <font color=\"#00E5FF\">None</font></b>"
+    targetDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+    targetDisplay.Font = Enum.Font.GothamBold
+    targetDisplay.TextSize = 11
+    targetDisplay.RichText = true
+    targetDisplay.Parent = PlayersTab
+    Instance.new("UICorner", targetDisplay).CornerRadius = UDim.new(0, 6)
+
+    local playerListContainer = Instance.new("ScrollingFrame")
+    playerListContainer.Size = UDim2.new(1, -4, 0, 180)
+    playerListContainer.BackgroundColor3 = Color3.fromRGB(18, 14, 35)
+    playerListContainer.BackgroundTransparency = 0.4
+    playerListContainer.ScrollBarThickness = 3
+    playerListContainer.Parent = PlayersTab
+    Instance.new("UICorner", playerListContainer).CornerRadius = UDim.new(0, 6)
+
+    local playerListLayout = Instance.new("UIListLayout")
+    playerListLayout.Padding = UDim.new(0, 4)
+    playerListLayout.Parent = playerListContainer
+
+    playerListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        playerListContainer.CanvasSize = UDim2.new(0, 0, 0, playerListLayout.AbsoluteContentSize.Y + 8)
+    end)
+
+    local function RefreshPlayerList()
+        for _, child in ipairs(playerListContainer:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                local pBtn = Instance.new("TextButton")
+                pBtn.Size = UDim2.new(1, -6, 0, 32)
+                pBtn.BackgroundColor3 = Color3.fromRGB(30, 24, 60)
+                pBtn.Text = "<b>" .. plr.DisplayName .. " (@" .. plr.Name .. ")</b>"
+                pBtn.TextColor3 = Color3.fromRGB(220, 220, 240)
+                pBtn.Font = Enum.Font.GothamBold
+                pBtn.TextSize = 10
+                pBtn.RichText = true
+                pBtn.Parent = playerListContainer
+                Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
+
+                pBtn.MouseButton1Click:Connect(function()
+                    selectedTarget = plr
+                    targetDisplay.Text = "<b>Selected Target: <font color=\"#00E5FF\">" .. plr.Name .. "</font></b>"
+                end)
+            end
+        end
+    end
+
+    RefreshPlayerList()
+    Players.PlayerAdded:Connect(RefreshPlayerList)
+    Players.PlayerRemoving:Connect(RefreshPlayerList)
+
+    CreateButton(PlayersTab, "Teleport to Player (Instant)", function()
+        if selectedTarget and selectedTarget.Character then
+            local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart") or selectedTarget.Character.PrimaryPart
+            if targetRoot then
+                SafeTeleport(targetRoot.CFrame + Vector3.new(0, 3, 0))
+            end
+        end
+    end)
+
+    CreateButton(PlayersTab, "Tween to Player (Smooth)", function()
+        if selectedTarget and selectedTarget.Character then
+            local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart") or selectedTarget.Character.PrimaryPart
+            if targetRoot then
+                TweenToPosition(targetRoot.CFrame + Vector3.new(0, 3, 0))
+            end
+        end
     end)
 
     -- PLAYER TAB CONTROLS
