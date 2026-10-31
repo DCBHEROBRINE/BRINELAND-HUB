@@ -161,7 +161,7 @@ local function VerifyAndLoadHub()
     MainFrame.Size = UDim2.fromOffset(380, 260)
     MainFrame.Position = UDim2.new(0.5, -190, 0.5, -130)
     MainFrame.BackgroundColor3 = Color3.fromRGB(14, 11, 25)
-    MainFrame.BackgroundTransparency = 0.18 -- Transparent Glass Look
+    MainFrame.BackgroundTransparency = 0.18
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Parent = ScreenGui
@@ -439,7 +439,7 @@ local function RunTaxiBoss()
     MainFrame.Size = UDim2.fromOffset(340, 320)
     MainFrame.Position = UDim2.new(0.5, -170, 0.5, -160)
     MainFrame.BackgroundColor3 = Color3.fromRGB(14, 11, 25)
-    MainFrame.BackgroundTransparency = 0.18 -- Transparent Glass Look
+    MainFrame.BackgroundTransparency = 0.18
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.ClipsDescendants = true
@@ -986,7 +986,7 @@ local function RunStealAnEgg()
     MainFrame.Size = UDim2.fromOffset(360, 430)
     MainFrame.Position = UDim2.new(0.5, -180, 0.5, -215)
     MainFrame.BackgroundColor3 = Color3.fromRGB(14, 12, 26)
-    MainFrame.BackgroundTransparency = 0.18 -- Transparent Glass Look
+    MainFrame.BackgroundTransparency = 0.18
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.ClipsDescendants = true
@@ -1564,7 +1564,7 @@ local function RunUniversalScript()
     MainFrame.Size = UDim2.fromOffset(360, 440)
     MainFrame.Position = UDim2.new(0.5, -180, 0.5, -220)
     MainFrame.BackgroundColor3 = Color3.fromRGB(14, 11, 25)
-    MainFrame.BackgroundTransparency = 0.18 -- Transparent Glass Look
+    MainFrame.BackgroundTransparency = 0.18
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.ClipsDescendants = true
@@ -1678,7 +1678,7 @@ local function RunUniversalScript()
     end
 
     local TeleportsTab = CreateTab("Teleports")
-    local PlayersTab   = CreateTab("Player")   -- Sketch requested name
+    local PlayersTab   = CreateTab("Player")
     local PlayerTab    = CreateTab("Cheats")
     local VisualsTab   = CreateTab("Visuals")
 
@@ -1947,7 +1947,6 @@ local function RunUniversalScript()
     -- PLAYERS TAB (MATCHING YOUR SKETCH LAYOUT)
     local selectedTarget = nil
 
-    -- 1. Dropdown / Selected Player Display Button (Top Corner Selector)
     local selectorBtn = Instance.new("TextButton")
     selectorBtn.Size = UDim2.new(1, -4, 0, 38)
     selectorBtn.BackgroundColor3 = Color3.fromRGB(28, 22, 55)
@@ -1960,7 +1959,6 @@ local function RunUniversalScript()
     selectorBtn.Parent = PlayersTab
     Instance.new("UICorner", selectorBtn).CornerRadius = UDim.new(0, 6)
 
-    -- Player List Dropdown Container (Hidden by default)
     local dropdownContainer = Instance.new("ScrollingFrame")
     dropdownContainer.Size = UDim2.new(1, -4, 0, 140)
     dropdownContainer.BackgroundColor3 = Color3.fromRGB(18, 14, 35)
@@ -2014,7 +2012,6 @@ local function RunUniversalScript()
         RefreshPlayerDropdown()
     end)
 
-    -- 2. Action Buttons Frame (TP, Walk, Tween layout exactly like your sketch)
     local actionCard = Instance.new("Frame")
     actionCard.Size = UDim2.new(1, -4, 0, 50)
     actionCard.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
@@ -2124,6 +2121,7 @@ elseif BLOX_FRUITS_IDS[PlaceId] or nameLower:find("blox fruit") then
     print("[BRINELAND] Detected Blox Fruits. Loading bloxfruits.lua...")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bloxfruits.lua"))()
 else
-    print("[BRINELAND] Unrecognized game: " + gameName + " (PlaceId: " + tostring(PlaceId) + "). Running Universal Hub...")
+    -- FIXED: Changed '+' to '..' for correct Lua string concatenation
+    print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
 end
