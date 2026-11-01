@@ -1304,6 +1304,8 @@ local function RunUniversalScript()
         FastInteract = false
     }
 
+    local Keybinds = {} -- Stores feature -> Enum.KeyCode
+
     local function SafeTeleport(targetCFrame)
         local char = LocalPlayer.Character
         if not char then return end
@@ -1529,6 +1531,15 @@ local function RunUniversalScript()
         end
     end
 
+    -- FIXED CLEAN VISION: Properly clears/restores original lighting & effects without blur
+    local originalLighting = {
+        Brightness = Lighting.Brightness,
+        ClockTime = Lighting.ClockTime,
+        GlobalShadows = Lighting.GlobalShadows,
+        FogEnd = Lighting.FogEnd
+    }
+    local effectStates = {}
+
     local function ToggleCleanVision(state)
         Config.CleanVision = state
         pcall(function()
@@ -1539,16 +1550,18 @@ local function RunUniversalScript()
                 Lighting.FogEnd = 100000
                 for _, desc in ipairs(Lighting:GetDescendants()) do
                     if desc:IsA("Atmosphere") or desc:IsA("PostEffect") or desc:IsA("Sky") then
+                        effectStates[desc] = desc.Enabled
                         desc.Enabled = false
                     end
                 end
             else
-                Lighting.Brightness = 1
-                Lighting.GlobalShadows = true
-                Lighting.FogEnd = 10000
+                Lighting.Brightness = originalLighting.Brightness
+                Lighting.ClockTime = originalLighting.ClockTime
+                Lighting.GlobalShadows = originalLighting.GlobalShadows
+                Lighting.FogEnd = originalLighting.FogEnd
                 for _, desc in ipairs(Lighting:GetDescendants()) do
-                    if desc:IsA("Atmosphere") or desc:IsA("PostEffect") or desc:IsA("Sky") then
-                        desc.Enabled = true
+                    if (desc:IsA("Atmosphere") or desc:IsA("PostEffect") or desc:IsA("Sky")) and effectStates[desc] ~= nil then
+                        desc.Enabled = effectStates[desc]
                     end
                 end
             end
@@ -1627,19 +1640,19 @@ local function RunUniversalScript()
 
     local TabLayout = Instance.new("UIListLayout")
     TabLayout.FillDirection = Enum.FillDirection.Horizontal
-    TabLayout.Padding = UDim.new(0, 3)
+    TabLayout.Padding = UDim.new(0, 2)
     TabLayout.Parent = TabBar
 
     local TabFrames = {}
     local function CreateTab(tabName)
         local tabBtn = Instance.new("TextButton")
-        tabBtn.Size = UDim2.new(0.24, 0, 1, 0)
+        tabBtn.Size = UDim2.new(0.19, 0, 1, 0)
         tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
         tabBtn.BackgroundTransparency = 0.3
         tabBtn.Text = "<b>" .. tabName .. "</b>"
         tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
         tabBtn.Font = Enum.Font.GothamBold
-        tabBtn.TextSize = 9.5
+        tabBtn.TextSize = 9
         tabBtn.RichText = true
         tabBtn.Parent = TabBar
         Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
@@ -1681,6 +1694,7 @@ local function RunUniversalScript()
     local PlayersTab   = CreateTab("Player")
     local PlayerTab    = CreateTab("Cheats")
     local VisualsTab   = CreateTab("Visuals")
+    local KeyTab       = CreateTab("Key") -- NEW KEY TAB
 
     TabFrames["Teleports"].Container.Visible = true
     TabFrames["Teleports"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
@@ -1944,7 +1958,7 @@ local function RunUniversalScript()
         tweenBtn.MouseButton1Click:Connect(function() TweenToPosition(savedPos) end)
     end)
 
-    -- PLAYERS TAB (MATCHING YOUR SKETCH LAYOUT)
+    -- PLAYERS TAB
     local selectedTarget = nil
 
     local selectorBtn = Instance.new("TextButton")
@@ -2098,6 +2112,64 @@ local function RunUniversalScript()
     -- VISUALS TAB CONTROLS
     CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
     CreateToggle(VisualsTab, "Clean Vision (Fullbright & No Fog)", function(state) ToggleCleanVision(state) end)
+
+    -- KEYBINDS TAB (KEY CONFIGURATION SYSTEM)
+    local bindableActions = {
+        {Name = "Fly Toggle", Action = function() Config.FlyEnabled = not Config.FlyEnabled if Config.FlyEnabled then EnableFly() else DisableFly() end end},
+        {Name = "Noclip Toggle", Action = function() Config.Noclip = not Config.Noclip end},
+        {Name = "Player ESP Toggle", Action = function() ToggleESPState(not Config.PlayerESP) end},
+        {Name = "Clean Vision Toggle", Action = function() ToggleCleanVision(not Config.CleanVision) end},
+        {Name = "Speed Boost Toggle", Action = function() Config.SpeedEnabled = not Config.SpeedEnabled end}
+    }
+
+    for _, item in ipairs(bindableActions) do
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, -4, 0, 40)
+        frame.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        frame.BackgroundTransparency = 0.25
+        frame.Parent = KeyTab
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -95, 1, 0)
+        lbl.Position = UDim2.new(0, 10, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = "<b>" .. item.Name .. "</b>"
+        lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 11
+        lbl.RichText = true
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = frame
+
+        local bindBtn = Instance.new("TextButton")
+        bindBtn.Size = UDim2.fromOffset(80, 26)
+        bindBtn.Position = UDim2.new(1, -86, 0.5, -13)
+        bindBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
+        bindBtn.Text = "<b>[ None ]</b>"
+        bindBtn.TextColor3 = Color3.fromRGB(0, 229, 255)
+        bindBtn.Font = Enum.Font.GothamBold
+        bindBtn.TextSize = 10
+        bindBtn.RichText = true
+        bindBtn.Parent = frame
+        Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
+
+        local listening = false
+        bindBtn.MouseButton1Click:Connect(function()
+            listening = true
+            bindBtn.Text = "<b>[...]</b>"
+        end)
+
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if listening and input.UserInputType == Enum.UserInputType.Keyboard then
+                listening = false
+                Keybinds[item.Name] = input.KeyCode
+                bindBtn.Text = "<b>[" .. input.KeyCode.Name .. "]</b>"
+            elseif not gameProcessed and Keybinds[item.Name] and input.KeyCode == Keybinds[item.Name] then
+                pcall(item.Action)
+            end
+        end)
+    end
 end
 
 -- ============================================================
@@ -2121,7 +2193,6 @@ elseif BLOX_FRUITS_IDS[PlaceId] or nameLower:find("blox fruit") then
     print("[BRINELAND] Detected Blox Fruits. Loading bloxfruits.lua...")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bloxfruits.lua"))()
 else
-    -- FIXED: Changed '+' to '..' for correct Lua string concatenation
     print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
 end
