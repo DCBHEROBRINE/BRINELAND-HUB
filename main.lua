@@ -2189,6 +2189,9 @@ if nameLower:find("taxi boss") or PlaceId == 7305826609 then
 elseif nameLower:find("steal an egg") or PlaceId == 115049386348611 then
     print("[BRINELAND] Detected Steal An Egg. Executing script...")
     RunStealAnEgg()
+elseif nameLower:find("speed keyboard escape") or nameLower:find("+1 speed") then
+    print("[BRINELAND] Detected +1 Speed Keyboard Escape. Loading SpeedKeyboardEscape.lua...")
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/SpeedKeyboardEscape.lua"))()
 elseif BLOX_FRUITS_IDS[PlaceId] or nameLower:find("blox fruit") then
     print("[BRINELAND] Detected Blox Fruits. Loading bloxfruits.lua...")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bloxfruits.lua"))()
