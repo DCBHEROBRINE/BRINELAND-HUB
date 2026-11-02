@@ -1,5 +1,5 @@
 -- ============================================================
--- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (ULTIMATE REFINED)
+-- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (FINAL PRODUCTION)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- ============================================================
 
@@ -10,10 +10,12 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local SoundService = game:GetService("SoundService")
+local Lighting = game:GetService("Lighting")
+local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------------------------------------
--- 1. ROBUST CENTRALIZED CONNECTION & LIFECYCLE MANAGER
+-- 1. CENTRALIZED CONNECTION & LIFECYCLE MANAGER
 --------------------------------------------------------------------------------
 local ConnectionManager = {
     Connections = {},
@@ -32,14 +34,12 @@ local ConnectionManager = {
         return inst
     end,
     Clean = function(self)
-        -- Reset all feature states
         AutoWinEnabled = false
         AutoTreadmillEnabled = false
         AutoRebirth = false
-        AirWalkEnabled = false
-        AutoEscapeEnabled = false
         AntiAfkEnabled = false
-        FreeKeySoundsEnabled = false
+        KeySoundsEnabled = false
+        LagReduceEnabled = false
 
         for _, conn in ipairs(self.Connections) do
             if conn and conn.Connected then
@@ -68,10 +68,9 @@ local ConnectionManager = {
 AutoWinEnabled = false
 AutoTreadmillEnabled = false
 AutoRebirth = false
-AirWalkEnabled = false
-AutoEscapeEnabled = false
 AntiAfkEnabled = false
-FreeKeySoundsEnabled = false
+KeySoundsEnabled = false
+LagReduceEnabled = false
 
 local TargetWinsLimit = 100
 local CurrentWinsFarmed = 0
@@ -79,46 +78,38 @@ local FarmDelay = 2.0
 
 local SelectedWinPadInstance = nil
 local WinPadMap = {}
-local AirWalkPart = nil
-local originalCollisions = setmetatable({}, {__mode = "k"})
 
--- Keyboard Sound Engine Assets
-local KeySoundIds = {
-    Mechanical = "rbxassetid://9114223178",
-    Thocky     = "rbxassetid://9114223522",
-    Bubble     = "rbxassetid://9114223945",
-    Cyber      = "rbxassetid://9114224211"
+-- Key Sound Assets Mapping
+local SoundProfiles = {
+    ["Clicky Keyboard"] = "rbxassetid://9035348386",
+    ["Cherry MX Brown"] = "rbxassetid://8350936375",
+    ["Rapid Typing Loop"] = "rbxassetid://4724430129",
+    ["Tactile Press"] = "rbxassetid://4723761654",
+    ["Standard Desktop"] = "rbxassetid://6366326610"
 }
-local SelectedSoundProfile = "Mechanical"
+local SelectedSoundName = "Clicky Keyboard"
 
 --------------------------------------------------------------------------------
--- 3. UTILITIES & SOUND ENGINE
+-- 3. UTILITIES & SOUND SYSTEM
 --------------------------------------------------------------------------------
 local function EscapeRichText(text)
     return text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub("\"", "&quot;"):gsub("'", "&apos;")
 end
 
-local function PlayFreeKeySound()
-    if not FreeKeySoundsEnabled then return end
-    local soundId = KeySoundIds[SelectedSoundProfile] or KeySoundIds.Mechanical
-    
-    local sound = Instance.new("Sound")
-    sound.SoundId = soundId
-    sound.Volume = 1.2
-    sound.Pitch = math.random(95, 105) / 100 -- Adds authentic mechanical click variation
-    sound.Parent = SoundService
-    sound:Play()
-
-    task.spawn(function()
-        sound.Ended:Wait()
-        sound:Destroy()
-    end)
-end
-
--- Key Press Detector for Free Key Sound Emulation
+-- Play Mechanical Sound on Any Key Press
 ConnectionManager:AddConnection(UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        PlayFreeKeySound()
+    if KeySoundsEnabled and input.UserInputType == Enum.UserInputType.Keyboard then
+        local soundId = SoundProfiles[SelectedSoundName] or SoundProfiles["Clicky Keyboard"]
+        local sound = Instance.new("Sound")
+        sound.SoundId = soundId
+        sound.Volume = 1.0
+        sound.Pitch = math.random(95, 105) / 100
+        sound.Parent = SoundService
+        sound:Play()
+        task.spawn(function()
+            sound.Ended:Wait()
+            sound:Destroy()
+        end)
     end
 end))
 
@@ -130,7 +121,7 @@ local function ScanForWinPads()
             local name = obj.Name:lower()
             if name:match("win") or name:match("finish") or name:match("reward") or name:match("%+%d") or name:match("goal") or name == "end" or name:match("exit") then
                 if obj:FindFirstChild("TouchInterest") or obj.CanTouch then
-                    local uniqueKey = string.format("%s [%d, %d] (%s)", obj.Name, math.floor(obj.Position.X), math.floor(obj.Position.Z), tostring(obj))
+                    local uniqueKey = string.format("%s [%d, %d]", obj.Name, math.floor(obj.Position.X), math.floor(obj.Position.Z))
                     table.insert(padList, uniqueKey)
                     WinPadMap[uniqueKey] = obj
                 end
@@ -148,13 +139,13 @@ local function FindTreadmill()
     if not root then return nil end
 
     if CachedTreadmill and CachedTreadmill.Parent and CachedTreadmill:IsDescendantOf(Workspace) then
-        if (root.Position - CachedTreadmill.Position).Magnitude <= 200 then
+        if (root.Position - CachedTreadmill.Position).Magnitude <= 300 then
             return CachedTreadmill
         end
     end
 
     CachedTreadmill = nil
-    local closest, shortest = nil, 200
+    local closest, shortest = nil, 300
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") then
             local name = obj.Name:lower()
@@ -174,19 +165,23 @@ local function FindTreadmill()
 end
 
 --------------------------------------------------------------------------------
--- 4. CHARACTER LIFECYCLE MANAGEMENT
+-- 4. BACKGROUND WORKERS (Anti-AFK, Auto Win, Treadmill)
 --------------------------------------------------------------------------------
-ConnectionManager:AddConnection(LocalPlayer.CharacterRemoving:Connect(function()
-    if AirWalkPart then
-        AirWalkPart:Destroy()
-        AirWalkPart = nil
+-- Fixed Anti-AFK Worker (Silently prevents server kick)
+ConnectionManager:AddThread(task.spawn(function()
+    while true do
+        task.wait(50)
+        if AntiAfkEnabled then
+            pcall(function()
+                local vu = game:GetService("VirtualUser")
+                vu:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+                task.wait(1)
+                vu:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+            end)
+        end
     end
-    originalCollisions = setmetatable({}, {__mode = "k"})
 end))
 
---------------------------------------------------------------------------------
--- 5. BACKGROUND WORKERS
---------------------------------------------------------------------------------
 ConnectionManager:AddThread(task.spawn(function()
     while true do
         task.wait(0.2)
@@ -237,47 +232,8 @@ ConnectionManager:AddThread(task.spawn(function()
     end
 end))
 
-ConnectionManager:AddConnection(RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    if AirWalkEnabled then
-        if not AirWalkPart then
-            AirWalkPart = Instance.new("Part")
-            AirWalkPart.Size = Vector3.new(12, 1, 12)
-            AirWalkPart.Anchored = true
-            AirWalkPart.Transparency = 0.6
-            AirWalkPart.Color = Color3.fromRGB(0, 229, 255)
-            AirWalkPart.Material = Enum.Material.Glass
-            AirWalkPart.Parent = Workspace
-            ConnectionManager:AddInstance(AirWalkPart)
-        end
-        AirWalkPart.CFrame = root.CFrame * CFrame.new(0, -3.5, 0)
-    else
-        if AirWalkPart then
-            AirWalkPart:Destroy()
-            AirWalkPart = nil
-        end
-    end
-
-    if AutoEscapeEnabled then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                if originalCollisions[part] == nil then originalCollisions[part] = part.CanCollide end
-                part.CanCollide = false
-            end
-        end
-    else
-        for part, state in pairs(originalCollisions) do
-            if part and part.Parent then part.CanCollide = state end
-        end
-        originalCollisions = setmetatable({}, {__mode = "k"})
-    end
-end))
-
 --------------------------------------------------------------------------------
--- 6. BRINELAND CUSTOM UI (BLUE & PURPLE MIX)
+-- 5. BRINELAND CUSTOM UI (BLUE & PURPLE MIX)
 --------------------------------------------------------------------------------
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 if PlayerGui:FindFirstChild("SpeedKeyboardEscapeHub") then
@@ -290,9 +246,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
 ConnectionManager:AddConnection(ScreenGui.AncestryChanged:Connect(function(_, parent)
-    if not parent then
-        ConnectionManager:Clean()
-    end
+    if not parent then ConnectionManager:Clean() end
 end))
 
 local MainFrame = Instance.new("Frame")
@@ -360,7 +314,7 @@ ConnectionManager:AddConnection(CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end))
 
--- Tab System
+-- Tab System matching your sketch: Area, Farms, Player, Misc
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -12, 0, 32)
 TabBar.Position = UDim2.new(0, 6, 0, 44)
@@ -449,7 +403,7 @@ ConnectionManager:AddConnection(MinimizeBtn.MouseButton1Click:Connect(function()
     end
 end))
 
--- Dragging
+-- Dragging logic
 local dragging, dragStart, startPos
 ConnectionManager:AddConnection(TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -469,7 +423,7 @@ ConnectionManager:AddConnection(UserInputService.InputEnded:Connect(function(inp
 end))
 
 --------------------------------------------------------------------------------
--- 7. UI COMPONENT BUILDERS
+-- 6. UI COMPONENT BUILDERS
 --------------------------------------------------------------------------------
 local function CreateToggle(parent, text, callback)
     local frame = Instance.new("Frame")
@@ -558,7 +512,7 @@ local function CreateInput(parent, text, defaultVal, callback)
 end
 
 --------------------------------------------------------------------------------
--- 8. POPULATING TABS
+-- 7. POPULATE TAB CONTENTS
 --------------------------------------------------------------------------------
 -- AREA TAB
 local padOptions = ScanForWinPads()
@@ -639,19 +593,77 @@ CreateInput(AreaTab, "Farm Delay (Sec)", FarmDelay, function(val) FarmDelay = va
 CreateToggle(FarmsTab, "Auto Train on Treadmill", function(state) AutoTreadmillEnabled = state end)
 CreateToggle(FarmsTab, "Auto Rebirth", function(state) AutoRebirth = state end)
 
--- PLAYER TAB
-CreateToggle(PlayerTab, "Unlock All Key Sounds (Free)", function(state) FreeKeySoundsEnabled = state end)
-CreateToggle(PlayerTab, "Auto Escape (Noclip)", function(state) AutoEscapeEnabled = state end)
-CreateToggle(PlayerTab, "Walk on Air Platform", function(state) AirWalkEnabled = state end)
+-- PLAYER TAB (Empty or additional player toggles if needed)
 
--- MISC TAB
+-- MISC TAB (Key Sounds, Anti-AFK, Lag Reduce matching your picture)
 CreateToggle(MiscTab, "Anti-AFK Protection", function(state) AntiAfkEnabled = state end)
+CreateToggle(MiscTab, "Enable Free Key Sounds", function(state) KeySoundsEnabled = state end)
 
-ConnectionManager:AddConnection(RunService.Stepped:Connect(function()
-    if AntiAfkEnabled then
-        local vim = game:GetService("VirtualInputManager")
-        pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.W, false, game) end)
-    end
+-- Key Sound Profile Selector Button
+local soundSelectorBtn = Instance.new("TextButton")
+soundSelectorBtn.Size = UDim2.new(1, -4, 0, 38)
+soundSelectorBtn.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+soundSelectorBtn.BackgroundTransparency = 0.25
+soundSelectorBtn.Text = "<b>Key Sound: <font color=\"#00E5FF\">" .. SelectedSoundName .. "</font></b>"
+soundSelectorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+soundSelectorBtn.Font = Enum.Font.GothamBold
+soundSelectorBtn.TextSize = 11
+soundSelectorBtn.RichText = true
+soundSelectorBtn.Parent = MiscTab
+Instance.new("UICorner", soundSelectorBtn).CornerRadius = UDim.new(0, 6)
+
+local soundDropdownContainer = Instance.new("ScrollingFrame")
+soundDropdownContainer.Size = UDim2.new(1, -4, 0, 110)
+soundDropdownContainer.BackgroundColor3 = Color3.fromRGB(18, 14, 35)
+soundDropdownContainer.BackgroundTransparency = 0.2
+soundDropdownContainer.ScrollBarThickness = 3
+soundDropdownContainer.Visible = false
+soundDropdownContainer.Parent = MiscTab
+Instance.new("UICorner", soundDropdownContainer).CornerRadius = UDim.new(0, 6)
+
+local soundDropLayout = Instance.new("UIListLayout")
+soundDropLayout.Padding = UDim.new(0, 4)
+soundDropLayout.Parent = soundDropdownContainer
+
+for profileName, _ in pairs(SoundProfiles) do
+    local sBtn = Instance.new("TextButton")
+    sBtn.Size = UDim2.new(1, -6, 0, 30)
+    sBtn.BackgroundColor3 = Color3.fromRGB(35, 28, 65)
+    sBtn.Text = "<b>" .. profileName .. "</b>"
+    sBtn.TextColor3 = Color3.fromRGB(220, 220, 240)
+    sBtn.Font = Enum.Font.GothamBold
+    sBtn.TextSize = 10
+    sBtn.RichText = true
+    sBtn.Parent = soundDropdownContainer
+    Instance.new("UICorner", sBtn).CornerRadius = UDim.new(0, 4)
+
+    ConnectionManager:AddConnection(sBtn.MouseButton1Click:Connect(function()
+        SelectedSoundName = profileName
+        soundSelectorBtn.Text = "<b>Key Sound: <font color=\"#00E5FF\">" .. profileName .. "</font></b>"
+        soundDropdownContainer.Visible = false
+    end))
+end
+
+ConnectionManager:AddConnection(soundSelectorBtn.MouseButton1Click:Connect(function()
+    soundDropdownContainer.Visible = not soundDropdownContainer.Visible
 end))
 
-print("[BRINELAND] SpeedKeyboardEscape.lua updated with Free Key Sounds!")
+-- Lag Reducer Toggle
+CreateToggle(MiscTab, "Lag Reducer (Boost FPS)", function(state)
+    LagReduceEnabled = state
+    pcall(function()
+        if state then
+            Lighting.GlobalShadows = false
+            Lighting.Brightness = 2
+            for _, v in ipairs(Workspace:GetDescendants()) do
+                if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Fire") or v:IsA("Sparkles") then
+                    v.Enabled = false
+                end
+            end
+        else
+            Lighting.GlobalShadows = true
+        end
+    end)
+end)
+
+print("[BRINELAND] SpeedKeyboardEscape.lua updated with Free Key Sounds & Fixes!")
