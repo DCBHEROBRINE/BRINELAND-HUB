@@ -1,5 +1,5 @@
 -- ============================================================
--- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (FINAL PRODUCTION)
+-- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (FINAL STEP SOUNDS)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- ============================================================
 
@@ -11,7 +11,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local SoundService = game:GetService("SoundService")
 local Lighting = game:GetService("Lighting")
-local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------------------------------------
@@ -79,39 +78,60 @@ local FarmDelay = 2.0
 local SelectedWinPadInstance = nil
 local WinPadMap = {}
 
--- Key Sound Assets Mapping
+-- Updated Custom Sound Profiles (Step/Action Sound Mapping)
 local SoundProfiles = {
-    ["Clicky Keyboard"] = "rbxassetid://9035348386",
-    ["Cherry MX Brown"] = "rbxassetid://8350936375",
-    ["Rapid Typing Loop"] = "rbxassetid://4724430129",
-    ["Tactile Press"] = "rbxassetid://4723761654",
-    ["Standard Desktop"] = "rbxassetid://6366326610"
+    ["Water Drop"] = "rbxassetid://403292408",
+    ["Slime Jump"] = "rbxassetid://344167846",
+    ["Keyboard Chocolate"] = "rbxassetid://125115489291773",
+    ["Rain Sounds Lava"] = "rbxassetid://104929259130147",
+    ["Keyboard Typing SFX"] = "rbxassetid://9116157306"
 }
-local SelectedSoundName = "Clicky Keyboard"
+local SelectedSoundName = "Water Drop"
 
 --------------------------------------------------------------------------------
--- 3. UTILITIES & SOUND SYSTEM
+-- 3. UTILITIES & MOVEMENT SOUND ENGINE
 --------------------------------------------------------------------------------
 local function EscapeRichText(text)
     return text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub("\"", "&quot;"):gsub("'", "&apos;")
 end
 
--- Play Mechanical Sound on Any Key Press
-ConnectionManager:AddConnection(UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if KeySoundsEnabled and input.UserInputType == Enum.UserInputType.Keyboard then
-        local soundId = SoundProfiles[SelectedSoundName] or SoundProfiles["Clicky Keyboard"]
-        local sound = Instance.new("Sound")
-        sound.SoundId = soundId
-        sound.Volume = 1.0
-        sound.Pitch = math.random(95, 105) / 100
-        sound.Parent = SoundService
-        sound:Play()
-        task.spawn(function()
-            sound.Ended:Wait()
-            sound:Destroy()
-        end)
+-- Play Sound Effect on Player Movement/Steps
+local lastSoundTick = 0
+local function PlayStepSound()
+    if not KeySoundsEnabled then return end
+    if tick() - lastSoundTick < 0.28 then return end -- Rate limit sound triggers per step
+    lastSoundTick = tick()
+
+    local soundId = SoundProfiles[SelectedSoundName] or SoundProfiles["Water Drop"]
+    local sound = Instance.new("Sound")
+    sound.SoundId = soundId
+    sound.Volume = 0.8
+    sound.Pitch = math.random(95, 105) / 100
+    sound.Parent = SoundService
+    sound:Play()
+
+    task.spawn(function()
+        sound.Ended:Wait()
+        sound:Destroy()
+    end)
+end
+
+-- Hook into Character Humanoid Running State for Footstep Sounds
+local function HookCharacter(char)
+    local humanoid = char:WaitForChild("Humanoid", 5)
+    if humanoid then
+        ConnectionManager:AddConnection(humanoid.Running:Connect(function(speed)
+            if speed > 1 then
+                PlayStepSound()
+            end
+        end))
     end
-end))
+end
+
+if LocalPlayer.Character then
+    HookCharacter(LocalPlayer.Character)
+end
+ConnectionManager:AddConnection(LocalPlayer.CharacterAdded:Connect(HookCharacter))
 
 local function ScanForWinPads()
     WinPadMap = {}
@@ -167,7 +187,6 @@ end
 --------------------------------------------------------------------------------
 -- 4. BACKGROUND WORKERS (Anti-AFK, Auto Win, Treadmill)
 --------------------------------------------------------------------------------
--- Fixed Anti-AFK Worker (Silently prevents server kick)
 ConnectionManager:AddThread(task.spawn(function()
     while true do
         task.wait(50)
@@ -593,18 +612,18 @@ CreateInput(AreaTab, "Farm Delay (Sec)", FarmDelay, function(val) FarmDelay = va
 CreateToggle(FarmsTab, "Auto Train on Treadmill", function(state) AutoTreadmillEnabled = state end)
 CreateToggle(FarmsTab, "Auto Rebirth", function(state) AutoRebirth = state end)
 
--- PLAYER TAB (Empty or additional player toggles if needed)
+-- PLAYER TAB (Empty slot for player expansions)
 
--- MISC TAB (Key Sounds, Anti-AFK, Lag Reduce matching your picture)
-CreateToggle(MiscTab, "Anti-AFK Protection", function(state) AntiAfkEnabled = state end)
-CreateToggle(MiscTab, "Enable Free Key Sounds", function(state) KeySoundsEnabled = state end)
+-- MISC TAB (Key Sounds, Anti-AFK, Lag Reducer matching your drawing)
+CreateToggle(MiscTab, "Anti-AFK", function(state) AntiAfkEnabled = state end)
+CreateToggle(MiscTab, "Key Sounds", function(state) KeySoundsEnabled = state end)
 
--- Key Sound Profile Selector Button
+-- Sound Profile Selector Button
 local soundSelectorBtn = Instance.new("TextButton")
 soundSelectorBtn.Size = UDim2.new(1, -4, 0, 38)
 soundSelectorBtn.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
 soundSelectorBtn.BackgroundTransparency = 0.25
-soundSelectorBtn.Text = "<b>Key Sound: <font color=\"#00E5FF\">" .. SelectedSoundName .. "</font></b>"
+soundSelectorBtn.Text = "<b>Sound Select: <font color=\"#00E5FF\">" .. SelectedSoundName .. "</font></b>"
 soundSelectorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 soundSelectorBtn.Font = Enum.Font.GothamBold
 soundSelectorBtn.TextSize = 11
@@ -639,7 +658,7 @@ for profileName, _ in pairs(SoundProfiles) do
 
     ConnectionManager:AddConnection(sBtn.MouseButton1Click:Connect(function()
         SelectedSoundName = profileName
-        soundSelectorBtn.Text = "<b>Key Sound: <font color=\"#00E5FF\">" .. profileName .. "</font></b>"
+        soundSelectorBtn.Text = "<b>Sound Select: <font color=\"#00E5FF\">" .. profileName .. "</font></b>"
         soundDropdownContainer.Visible = false
     end))
 end
@@ -649,7 +668,7 @@ ConnectionManager:AddConnection(soundSelectorBtn.MouseButton1Click:Connect(funct
 end))
 
 -- Lag Reducer Toggle
-CreateToggle(MiscTab, "Lag Reducer (Boost FPS)", function(state)
+CreateToggle(MiscTab, "Lag Reducer", function(state)
     LagReduceEnabled = state
     pcall(function()
         if state then
@@ -666,4 +685,4 @@ CreateToggle(MiscTab, "Lag Reducer (Boost FPS)", function(state)
     end)
 end)
 
-print("[BRINELAND] SpeedKeyboardEscape.lua updated with Free Key Sounds & Fixes!")
+print("[BRINELAND] SpeedKeyboardEscape.lua updated with movement step sounds & fixes!")
