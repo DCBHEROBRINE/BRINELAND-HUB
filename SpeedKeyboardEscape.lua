@@ -1,5 +1,5 @@
 -- ============================================================
--- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (DYNAMIC STEP SOUNDS)
+-- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (FINAL SOUND & LAG FIX)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- ============================================================
 
@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local SoundService = game:GetService("SoundService")
 local Lighting = game:GetService("Lighting")
+local UserGameSettings = UserSettings():GetService("UserGameSettings")
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------------------------------------
@@ -39,6 +40,12 @@ local ConnectionManager = {
         AntiAfkEnabled = false
         KeySoundsEnabled = false
         LagReduceEnabled = false
+
+        -- Restore graphics if lag reducer was active
+        pcall(function()
+            UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.Level21
+            Lighting.GlobalShadows = true
+        end)
 
         for _, conn in ipairs(self.Connections) do
             if conn and conn.Connected then
@@ -78,7 +85,7 @@ local FarmDelay = 2.0
 local SelectedWinPadInstance = nil
 local WinPadMap = {}
 
--- Sound Profiles Mapping
+-- Custom Sound Profiles
 local SoundProfiles = {
     ["Water Drop"] = "rbxassetid://403292408",
     ["Slime Jump"] = "rbxassetid://344167846",
@@ -89,47 +96,46 @@ local SoundProfiles = {
 local SelectedSoundName = "Water Drop"
 
 --------------------------------------------------------------------------------
--- 3. UTILITIES & DYNAMIC SOUND ENGINE
+-- 3. UTILITIES & ADVANCED SOUND REPLACEMENT ENGINE
 --------------------------------------------------------------------------------
 local function EscapeRichText(text)
     return text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub("\"", "&quot;"):gsub("'", "&apos;")
 end
 
--- Silence Default In-Game Keyboard Sounds
-local function MuteDefaultGameSounds(char)
-    if not char then return end
-    task.spawn(function()
-        for _, sound in ipairs(char:GetDescendants()) do
-            if sound:IsA("Sound") then
-                local sName = sound.Name:lower()
-                if sName:find("keyboard") or sName:find("type") or sName:find("click") or sName:find("step") then
-                    sound.Volume = 0
-                end
+-- Completely destroy and wipe out any in-game keyboard or typing sounds globally
+local function DestroyGameKeyboardSounds()
+    local function checkAndDestroy(obj)
+        if obj:IsA("Sound") then
+            local name = obj.Name:lower()
+            if name:find("keyboard") or name:find("type") or name:find("typing") or name:find("key") then
+                pcall(function()
+                    obj.Volume = 0
+                    obj.Playing = false
+                    obj:Destroy()
+                end)
             end
         end
-    end)
+    end
+
+    -- Initial sweep of Workspace and SoundService
+    for _, v in ipairs(Workspace:GetDescendants()) do checkAndDestroy(v) end
+    for _, v in ipairs(SoundService:GetDescendants()) do checkAndDestroy(v) end
+
+    -- Continuously intercept newly spawned game keyboard sounds
+    ConnectionManager:AddConnection(Workspace.DescendantAdded:Connect(checkAndDestroy))
+    ConnectionManager:AddConnection(SoundService.DescendantAdded:Connect(checkAndDestroy))
 end
 
--- Play Step Sound Dynamic to WalkSpeed
-local lastSoundTick = 0
-local function PlayDynamicStepSound(walkSpeed)
+-- Play Custom Script Sound matched with WalkSpeed
+local function PlayCustomSound(walkSpeed)
     if not KeySoundsEnabled then return end
-    
-    -- Dynamically calculate step delay based on WalkSpeed so rhythm matches movement
-    local baseSpeed = math.max(16, walkSpeed or 16)
-    local stepDelay = math.clamp(4.0 / baseSpeed, 0.08, 0.35)
-    
-    if tick() - lastSoundTick < stepDelay then return end
-    lastSoundTick = tick()
-
     local soundId = SoundProfiles[SelectedSoundName] or SoundProfiles["Water Drop"]
     local sound = Instance.new("Sound")
     sound.SoundId = soundId
-    sound.Volume = 0.85
-    
-    -- Pitch scaling slightly increases with walkspeed for responsive feedback
-    local pitchMultiplier = math.clamp(1 + (baseSpeed - 16) / 200, 0.95, 1.3)
-    sound.Pitch = (math.random(96, 104) / 100) * pitchMultiplier
+    sound.Volume = 0.95
+    local baseSpeed = math.max(16, walkSpeed or 16)
+    local pitchMultiplier = math.clamp(1 + (baseSpeed - 16) / 250, 0.95, 1.35)
+    sound.Pitch = (math.random(95, 105) / 100) * pitchMultiplier
     sound.Parent = SoundService
     sound:Play()
 
@@ -139,23 +145,30 @@ local function PlayDynamicStepSound(walkSpeed)
     end)
 end
 
--- Hook Character Running State
-local function HookCharacter(char)
-    MuteDefaultGameSounds(char)
-    local humanoid = char:WaitForChild("Humanoid", 5)
-    if humanoid then
-        ConnectionManager:AddConnection(humanoid.Running:Connect(function(speed)
-            if speed > 1 then
-                PlayDynamicStepSound(humanoid.WalkSpeed)
-            end
-        end))
-    end
-end
+-- Continuous Movement & Speed Matching Heartbeat Loop
+local soundAccumulator = 0
+ConnectionManager:AddConnection(RunService.Heartbeat:Connect(function(dt)
+    if not KeySoundsEnabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then return end
 
-if LocalPlayer.Character then
-    HookCharacter(LocalPlayer.Character)
-end
-ConnectionManager:AddConnection(LocalPlayer.CharacterAdded:Connect(HookCharacter))
+    -- Only play when player is actively moving on the ground
+    if humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
+        local speed = math.max(16, humanoid.WalkSpeed)
+        local interval = math.clamp(3.0 / speed, 0.05, 0.32)
+        
+        soundAccumulator = soundAccumulator + dt
+        if soundAccumulator >= interval then
+            soundAccumulator = 0
+            PlayCustomSound(speed)
+        end
+    else
+        soundAccumulator = 0
+    end
+end))
 
 local function ScanForWinPads()
     WinPadMap = {}
@@ -357,7 +370,7 @@ ConnectionManager:AddConnection(CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end))
 
--- Tab System
+-- Tab System matching your sketch: Area, Farms, Player, Misc
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -12, 0, 32)
 TabBar.Position = UDim2.new(0, 6, 0, 44)
@@ -446,7 +459,7 @@ ConnectionManager:AddConnection(MinimizeBtn.MouseButton1Click:Connect(function()
     end
 end))
 
--- Dragging
+-- Dragging logic
 local dragging, dragStart, startPos
 ConnectionManager:AddConnection(TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -642,8 +655,8 @@ CreateToggle(FarmsTab, "Auto Rebirth", function(state) AutoRebirth = state end)
 CreateToggle(MiscTab, "Anti-AFK", function(state) AntiAfkEnabled = state end)
 CreateToggle(MiscTab, "Key Sounds", function(state)
     KeySoundsEnabled = state
-    if state and LocalPlayer.Character then
-        MuteDefaultGameSounds(LocalPlayer.Character)
+    if state then
+        DestroyGameKeyboardSounds()
     end
 end)
 
@@ -696,22 +709,26 @@ ConnectionManager:AddConnection(soundSelectorBtn.MouseButton1Click:Connect(funct
     soundDropdownContainer.Visible = not soundDropdownContainer.Visible
 end))
 
--- Lag Reducer Toggle
+-- Lag Reducer Toggle (True Low Graphics / FPS Boost)
 CreateToggle(MiscTab, "Lag Reducer", function(state)
     LagReduceEnabled = state
     pcall(function()
         if state then
+            UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.Level01
             Lighting.GlobalShadows = false
             Lighting.Brightness = 2
             for _, v in ipairs(Workspace:GetDescendants()) do
-                if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Fire") or v:IsA("Sparkles") then
+                if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Smoke") then
                     v.Enabled = false
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v.Transparency = 1
                 end
             end
         else
+            UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.Level21
             Lighting.GlobalShadows = true
         end
     end)
 end)
 
-print("[BRINELAND] SpeedKeyboardEscape.lua updated with Speed-Matched Footstep Sounds!")
+print("[BRINELAND] SpeedKeyboardEscape.lua updated successfully!")
