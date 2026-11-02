@@ -1,5 +1,5 @@
 -- ============================================================
--- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (FINAL STEP SOUNDS)
+-- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (DYNAMIC STEP SOUNDS)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- ============================================================
 
@@ -78,7 +78,7 @@ local FarmDelay = 2.0
 local SelectedWinPadInstance = nil
 local WinPadMap = {}
 
--- Updated Custom Sound Profiles (Step/Action Sound Mapping)
+-- Sound Profiles Mapping
 local SoundProfiles = {
     ["Water Drop"] = "rbxassetid://403292408",
     ["Slime Jump"] = "rbxassetid://344167846",
@@ -89,24 +89,47 @@ local SoundProfiles = {
 local SelectedSoundName = "Water Drop"
 
 --------------------------------------------------------------------------------
--- 3. UTILITIES & MOVEMENT SOUND ENGINE
+-- 3. UTILITIES & DYNAMIC SOUND ENGINE
 --------------------------------------------------------------------------------
 local function EscapeRichText(text)
     return text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub("\"", "&quot;"):gsub("'", "&apos;")
 end
 
--- Play Sound Effect on Player Movement/Steps
+-- Silence Default In-Game Keyboard Sounds
+local function MuteDefaultGameSounds(char)
+    if not char then return end
+    task.spawn(function()
+        for _, sound in ipairs(char:GetDescendants()) do
+            if sound:IsA("Sound") then
+                local sName = sound.Name:lower()
+                if sName:find("keyboard") or sName:find("type") or sName:find("click") or sName:find("step") then
+                    sound.Volume = 0
+                end
+            end
+        end
+    end)
+end
+
+-- Play Step Sound Dynamic to WalkSpeed
 local lastSoundTick = 0
-local function PlayStepSound()
+local function PlayDynamicStepSound(walkSpeed)
     if not KeySoundsEnabled then return end
-    if tick() - lastSoundTick < 0.28 then return end -- Rate limit sound triggers per step
+    
+    -- Dynamically calculate step delay based on WalkSpeed so rhythm matches movement
+    local baseSpeed = math.max(16, walkSpeed or 16)
+    local stepDelay = math.clamp(4.0 / baseSpeed, 0.08, 0.35)
+    
+    if tick() - lastSoundTick < stepDelay then return end
     lastSoundTick = tick()
 
     local soundId = SoundProfiles[SelectedSoundName] or SoundProfiles["Water Drop"]
     local sound = Instance.new("Sound")
     sound.SoundId = soundId
-    sound.Volume = 0.8
-    sound.Pitch = math.random(95, 105) / 100
+    sound.Volume = 0.85
+    
+    -- Pitch scaling slightly increases with walkspeed for responsive feedback
+    local pitchMultiplier = math.clamp(1 + (baseSpeed - 16) / 200, 0.95, 1.3)
+    sound.Pitch = (math.random(96, 104) / 100) * pitchMultiplier
     sound.Parent = SoundService
     sound:Play()
 
@@ -116,13 +139,14 @@ local function PlayStepSound()
     end)
 end
 
--- Hook into Character Humanoid Running State for Footstep Sounds
+-- Hook Character Running State
 local function HookCharacter(char)
+    MuteDefaultGameSounds(char)
     local humanoid = char:WaitForChild("Humanoid", 5)
     if humanoid then
         ConnectionManager:AddConnection(humanoid.Running:Connect(function(speed)
             if speed > 1 then
-                PlayStepSound()
+                PlayDynamicStepSound(humanoid.WalkSpeed)
             end
         end))
     end
@@ -185,7 +209,7 @@ local function FindTreadmill()
 end
 
 --------------------------------------------------------------------------------
--- 4. BACKGROUND WORKERS (Anti-AFK, Auto Win, Treadmill)
+-- 4. BACKGROUND WORKERS
 --------------------------------------------------------------------------------
 ConnectionManager:AddThread(task.spawn(function()
     while true do
@@ -252,7 +276,7 @@ ConnectionManager:AddThread(task.spawn(function()
 end))
 
 --------------------------------------------------------------------------------
--- 5. BRINELAND CUSTOM UI (BLUE & PURPLE MIX)
+-- 5. BRINELAND CUSTOM UI
 --------------------------------------------------------------------------------
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 if PlayerGui:FindFirstChild("SpeedKeyboardEscapeHub") then
@@ -333,7 +357,7 @@ ConnectionManager:AddConnection(CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end))
 
--- Tab System matching your sketch: Area, Farms, Player, Misc
+-- Tab System
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -12, 0, 32)
 TabBar.Position = UDim2.new(0, 6, 0, 44)
@@ -422,7 +446,7 @@ ConnectionManager:AddConnection(MinimizeBtn.MouseButton1Click:Connect(function()
     end
 end))
 
--- Dragging logic
+-- Dragging
 local dragging, dragStart, startPos
 ConnectionManager:AddConnection(TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -612,13 +636,18 @@ CreateInput(AreaTab, "Farm Delay (Sec)", FarmDelay, function(val) FarmDelay = va
 CreateToggle(FarmsTab, "Auto Train on Treadmill", function(state) AutoTreadmillEnabled = state end)
 CreateToggle(FarmsTab, "Auto Rebirth", function(state) AutoRebirth = state end)
 
--- PLAYER TAB (Empty slot for player expansions)
+-- PLAYER TAB
 
--- MISC TAB (Key Sounds, Anti-AFK, Lag Reducer matching your drawing)
+-- MISC TAB
 CreateToggle(MiscTab, "Anti-AFK", function(state) AntiAfkEnabled = state end)
-CreateToggle(MiscTab, "Key Sounds", function(state) KeySoundsEnabled = state end)
+CreateToggle(MiscTab, "Key Sounds", function(state)
+    KeySoundsEnabled = state
+    if state and LocalPlayer.Character then
+        MuteDefaultGameSounds(LocalPlayer.Character)
+    end
+end)
 
--- Sound Profile Selector Button
+-- Sound Selector Button
 local soundSelectorBtn = Instance.new("TextButton")
 soundSelectorBtn.Size = UDim2.new(1, -4, 0, 38)
 soundSelectorBtn.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
@@ -685,4 +714,4 @@ CreateToggle(MiscTab, "Lag Reducer", function(state)
     end)
 end)
 
-print("[BRINELAND] SpeedKeyboardEscape.lua updated with movement step sounds & fixes!")
+print("[BRINELAND] SpeedKeyboardEscape.lua updated with Speed-Matched Footstep Sounds!")
