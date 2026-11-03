@@ -1,5 +1,5 @@
 -- ============================================================
--- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (ULTIMATE PRECISION)
+-- BRINELAND HUB: +1 SPEED KEYBOARD ESCAPE (PERFECTED FINAL EDITION)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- ============================================================
 
@@ -100,29 +100,49 @@ local SoundProfiles = {
 local SelectedSoundName = "Water Drop"
 
 --------------------------------------------------------------------------------
--- 3. UTILITIES & REPLACED SOUND / SPEED ENGINE
+-- 3. UTILITIES & ADVANCED SOUND REPLACEMENT ENGINE
 --------------------------------------------------------------------------------
 local function EscapeRichText(text)
     return text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub("\"", "&quot;"):gsub("'", "&apos;")
 end
 
--- Erase all native game keyboard sounds globally
-local function MuteGameKeyboardSounds()
-    local function wipe(obj)
+-- Absolute Game Keyboard Sound Eraser & Replacer
+local SoundMuteConnections = {}
+local function ToggleGameSoundMute(enable)
+    for _, conn in ipairs(SoundMuteConnections) do
+        if conn then conn:Disconnect() end
+    end
+    SoundMuteConnections = {}
+
+    local function muteObj(obj)
         if obj:IsA("Sound") then
             local n = obj.Name:lower()
-            if n:find("keyboard") or n:find("type") or n:find("typing") or n:find("key") then
-                pcall(function() obj.Volume = 0; obj:Destroy() end)
+            if n:find("keyboard") or n:find("type") or n:find("typing") or n:find("key") or n:find("click") then
+                pcall(function()
+                    obj.Volume = enable and 0 or 0.5
+                end)
             end
         end
     end
-    for _, v in ipairs(Workspace:GetDescendants()) do wipe(v) end
-    for _, v in ipairs(SoundService:GetDescendants()) do wipe(v) end
-    ConnectionManager:AddConnection(Workspace.DescendantAdded:Connect(wipe))
-    ConnectionManager:AddConnection(SoundService.DescendantAdded:Connect(wipe))
+
+    -- Sweep existing sounds in game
+    for _, v in ipairs(Workspace:GetDescendants()) do muteObj(v) end
+    for _, v in ipairs(SoundService:GetDescendants()) do muteObj(v) end
+    if LocalPlayer.Character then
+        for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do muteObj(v) end
+    end
+
+    if enable then
+        table.insert(SoundMuteConnections, Workspace.DescendantAdded:Connect(muteObj))
+        table.insert(SoundMuteConnections, SoundService.DescendantAdded:Connect(muteObj))
+        table.insert(SoundMuteConnections, LocalPlayer.CharacterAdded:Connect(function(char)
+            table.insert(SoundMuteConnections, char.DescendantAdded:Connect(muteObj))
+            for _, v in ipairs(char:GetDescendants()) do muteObj(v) end
+        end))
+    end
 end
 
--- Play Custom Sound Perfectly Matched to WalkSpeed
+-- Play Custom Script Sound Perfectly Matched to WalkSpeed Rhythm
 local function PlayMatchedSound(currentSpeed)
     if not KeySoundsEnabled then return end
     local soundId = SoundProfiles[SelectedSoundName] or SoundProfiles["Water Drop"]
@@ -130,9 +150,8 @@ local function PlayMatchedSound(currentSpeed)
     sound.SoundId = soundId
     sound.Volume = 1.0
     
-    -- Exact pitch and rate calculation mapped to movement speed
-    local speedRatio = math.clamp(currentSpeed / 16, 0.8, 3.5)
-    sound.Pitch = math.clamp(0.9 + (speedRatio * 0.15), 0.8, 1.6)
+    local speedRatio = math.clamp(currentSpeed / 16, 0.8, 4.0)
+    sound.Pitch = math.clamp(0.9 + (speedRatio * 0.12), 0.8, 1.5)
     
     sound.Parent = SoundService
     sound:Play()
@@ -143,7 +162,7 @@ local function PlayMatchedSound(currentSpeed)
     end)
 end
 
--- Real-time Movement & WalkSpeed Frequency Tracker (No lagging or stopping)
+-- Real-time Movement & WalkSpeed Frequency Tracker
 local soundTimer = 0
 ConnectionManager:AddConnection(RunService.Heartbeat:Connect(function(dt)
     if not KeySoundsEnabled then return end
@@ -155,8 +174,7 @@ ConnectionManager:AddConnection(RunService.Heartbeat:Connect(function(dt)
 
     if humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
         local currentSpeed = math.max(16, humanoid.WalkSpeed)
-        -- Dynamic interval formula: higher walk speed triggers the custom sound faster and perfectly in-sync
-        local interval = math.clamp(2.4 / (currentSpeed ^ 0.75), 0.06, 0.3)
+        local interval = math.clamp(2.2 / (currentSpeed ^ 0.7), 0.05, 0.28)
 
         soundTimer = soundTimer + dt
         if soundTimer >= interval then
@@ -187,7 +205,6 @@ local function ScanForWinPads()
     return padList
 end
 
--- Enhanced Treadmill Finder targeting "Place Treadmill" parts or UI buttons
 local CachedTreadmill = nil
 local function FindTreadmill()
     local char = LocalPlayer.Character
@@ -260,7 +277,6 @@ ConnectionManager:AddThread(task.spawn(function()
     end
 end))
 
--- Auto Treadmill Worker (Teleports/locks player to the training treadmill area)
 ConnectionManager:AddThread(task.spawn(function()
     while true do
         task.wait(0.15)
@@ -302,7 +318,10 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
 ConnectionManager:AddConnection(ScreenGui.AncestryChanged:Connect(function(_, parent)
-    if not parent then ConnectionManager:Clean() end
+    if not parent then
+        ToggleGameSoundMute(false)
+        ConnectionManager:Clean()
+    end
 end))
 
 local MainFrame = Instance.new("Frame")
@@ -366,11 +385,12 @@ CloseBtn.Parent = TopBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
 ConnectionManager:AddConnection(CloseBtn.MouseButton1Click:Connect(function()
+    ToggleGameSoundMute(false)
     ConnectionManager:Clean()
     ScreenGui:Destroy()
 end))
 
--- Tab System matching your sketch: Area, Farms, Player, Misc
+-- Tab System: Area, Farms, Player, Misc
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -12, 0, 32)
 TabBar.Position = UDim2.new(0, 6, 0, 44)
@@ -648,7 +668,7 @@ CreateInput(AreaTab, "Farm Delay (Sec)", FarmDelay, function(val) FarmDelay = va
 -- FARMS TAB
 CreateToggle(FarmsTab, "Auto Rebirth", function(state) AutoRebirth = state end)
 
--- PLAYER TAB (Includes Player Speed, Treadmill Toggle, and Overrides)
+-- PLAYER TAB (Includes Treadmill Training & WalkSpeed Control)
 CreateToggle(PlayerTab, "Auto Treadmill (Training)", function(state) AutoTreadmillEnabled = state end)
 
 CreateInput(PlayerTab, "Player WalkSpeed", CustomWalkSpeedVal, function(val)
@@ -669,9 +689,7 @@ end))
 CreateToggle(MiscTab, "Anti-AFK", function(state) AntiAfkEnabled = state end)
 CreateToggle(MiscTab, "Key Sounds", function(state)
     KeySoundsEnabled = state
-    if state then
-        MuteGameKeyboardSounds()
-    end
+    ToggleGameSoundMute(state) -- Automatically erases and mutes game sounds when toggled ON
 end)
 
 -- Sound Selector Button
@@ -745,4 +763,4 @@ CreateToggle(MiscTab, "Lag Reducer", function(state)
     end)
 end)
 
-print("[BRINELAND] SpeedKeyboardEscape.lua updated to Ultimate Version successfully!")
+print("[BRINELAND] SpeedKeyboardEscape.lua updated to Perfected Ultimate Version!")
