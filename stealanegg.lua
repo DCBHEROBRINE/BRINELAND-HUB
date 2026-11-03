@@ -1,5 +1,5 @@
 -- ==============================================================================
--- BRINELAND HUB: STEAL AN EGG V9 (ULTIMATE PASCUA MASTER EDITION)
+-- BRINELAND HUB: STEAL AN EGG V10.0 (BULLETPROOF PRODUCTION EDITION)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- ==============================================================================
 
@@ -11,8 +11,11 @@ if env.PascuaHub and env.PascuaHub.Destroy then
 end
 
 local function cloneRef(obj)
-    if cloneref then return cloneref(obj) end
-    return obj
+    local ok, res = pcall(function()
+        if cloneref then return cloneref(obj) end
+        return obj
+    end)
+    return ok and res or obj
 end
 
 local function getService(name)
@@ -34,7 +37,9 @@ local Stats             = getService("Stats")
 local GuiService        = getService("GuiService")
 local CoreGui           = getService("CoreGui")
 local SoundService      = getService("SoundService")
-local UserGameSettings  = UserSettings():GetService("UserGameSettings")
+
+local okSettings, userGameSettings = pcall(function() return UserSettings():GetService("UserGameSettings") end)
+local UserGameSettings = okSettings and userGameSettings or nil
 
 local LP = Players.LocalPlayer
 local CFG_FILE = "BrinelandHub_StealAnEgg.json"
@@ -42,16 +47,18 @@ local CFG_FILE = "BrinelandHub_StealAnEgg.json"
 local P = { 
     Conns = {}, Guis = {}, Drawings = {}, Refresh = {}, Tasks = {}, Cleanups = {},
     Running = false, Stealing = false, Base = nil, BaseLocked = false,
-    EggCache = {}, LastScan = 0, EggHistory = {}, Log = {} 
+    EggCache = {}, LastScan = 0, EggHistory = {}, Log = {},
+    Errors = {}, ErrorOrder = {}, LastSync = 0, EggCount = 0
 }
 env.PascuaHub = P
 
-P.Flags = {
+local DEFAULT_FLAGS = {
     AutoSteal=false, InstantSteal=false, AutoReturn=true, StealDelay=0.4,
     AutoHatch=false, AutoEquipBest=false, AutoPlace=false, AutoSellEgg=false,
     AutoSellPet=false, AutoFuse=false, AutoFavorite=false,
     TargetArea="", MinRarity="All", SpecificEgg="",
-    EggPredictor=false, PreviewCard=false, WebhookAlert=false, WebhookURL="",
+    EggPredictor=true, PreviewCard=true, ShowLearning=true, ResyncInterval=30, MaxPredictions=8,
+    WebhookAlert=false, WebhookURL="",
     AutoRift=false, AutoRiftPlace=false, AutoRiftTrade=false, AutoBoss=false, WaitLastPity=false,
     AutoTreadmill=false, AutoUpgradeTread=false, AutoUpgradeBase=false, AutoTrail=false,
     AutoClaim=false, TreadmillTier=10,
@@ -65,6 +72,9 @@ P.Flags = {
     KeySounds=false, LagReducer=false, AutoHit=false, HitRange=12,
 }
 
+P.Flags = {}
+for k, v in pairs(DEFAULT_FLAGS) do P.Flags[k] = v end
+
 P.Remotes = {
     Steal="StealEgg", Treadmill="Treadmill", Upgrade="UpgradeTreadmill", UpgradeBase="UpgradeBase",
     Hatch="HatchEgg", Place="PlaceEgg", SellEgg="SellEgg", SellPet="SellPet", Fuse="FusePet",
@@ -73,9 +83,56 @@ P.Remotes = {
 }
 
 local VOLATILE = { Fly=1, Noclip=1, Invisible=1, GodMode=1, InfiniteJump=1, FPSBoost=1, UncapFPS=1, RemoteLog=1, KeySounds=1, LagReducer=1 }
-local Orig = {}
+local Orig = { SoundVolumes = {}, VisualStates = {}, LagReducerConn = nil, FpsCap = nil }
 
--- Custom Sound Profiles Mapping
+-- Compatibility & Safe Wrappers
+local httpInvoke = (syn and syn.request) or (http and http.request) or request or function(t)
+    if t.Method == "GET" then return { Body = game:HttpGet(t.Url) } end
+    return nil
+end
+
+local function safeGet(url)
+    local ok, res = pcall(function() return httpInvoke({ Url = url, Method = "GET" }) end)
+    if ok and res then return res.Body or res end
+    return nil
+end
+
+local function safeFpsCap(val)
+    local ok = pcall(function()
+        if setfpscap then setfpscap(val) end
+    end)
+    return ok
+end
+
+local function safeGetFpsCap()
+    local ok, res = pcall(function()
+        if getfpscap then return getfpscap() end
+        return 60
+    end)
+    return ok and res or 60
+end
+
+-- Diagnostics & Safe Execution
+local MAX_ERRORS = 50
+local function report(tag, err)
+    local message = tostring(err)
+    local key = tostring(tag) .. "|" .. message
+    if P.Errors[key] then P.Errors[key].Count += 1; return end
+    if #P.ErrorOrder >= MAX_ERRORS then return end
+    P.Errors[key] = { Tag = tostring(tag), Message = message, Count = 1, Time = os.date("%H:%M:%S") }
+    table.insert(P.ErrorOrder, key)
+    warn("[Brineland V10] " .. tostring(tag) .. ": " .. message)
+end
+
+local function safe(tag, callback, ...)
+    local ok, result = pcall(callback, ...)
+    if not ok then report(tag, result) end
+    return ok, result
+end
+
+local function args(s) if s == nil or s == "" then return end return s end
+
+-- Sound Profiles Mapping
 local SoundProfiles = {
     ["Water Drop"]          = "rbxassetid://403292408",
     ["Slime Jump"]          = "rbxassetid://344167846",
@@ -85,10 +142,25 @@ local SoundProfiles = {
 }
 local SelectedSoundName = "Water Drop"
 
-local function connect(sig, fn) local c = sig:Connect(fn); table.insert(P.Conns, c); return c end
-local function spawnTask(fn) local th = task.spawn(fn); table.insert(P.Tasks, th); return th end
-local function onCleanup(fn) table.insert(P.Cleanups, fn) end
-local function args(s) if s == nil or s == "" then return end return s end
+local function connect(sig, fn) 
+    local c = sig:Connect(function(...)
+        local ok, err = pcall(fn, ...)
+        if not ok then report("connection", err) end
+    end)
+    table.insert(P.Conns, c)
+    return c 
+end
+
+local function spawnTask(name, interval, fn)
+    local th = task.spawn(function()
+        while P.Running do
+            safe("loop:" .. name, fn)
+            task.wait(interval)
+        end
+    end)
+    table.insert(P.Tasks, th)
+    return th
+end
 
 local function notify(title, text, dur)
     pcall(function()
@@ -100,49 +172,36 @@ local function getHum()  local c = LP.Character; return c and c:FindFirstChildOf
 local function getRoot() local c = LP.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 local function alive()   local h = getHum(); return h and h.Health > 0 and getRoot() ~= nil end
 
-local function every(t, fn)
-    spawnTask(function()
-        local lastErr
-        while P.Running do
-            local ok, err = pcall(fn)
-            if not ok and err ~= lastErr then lastErr = err; warn("[Brineland] loop error: " .. tostring(err)) end
-            task.wait(t)
-        end
-    end)
-end
-
-local function httpGet(url)
-    if request then local r = request({ Url=url, Method="GET" }); return r and r.Body end
-    return game:HttpGet(url)
-end
-
 local remoteCache = {}
 local function resolveRemote(name)
     if name == "" then return nil end
-    local c = remoteCache[name]
-    if c and c.Parent then return c end
-    local low, partial = name:lower(), nil
+    if remoteCache[name] and remoteCache[name].Parent then return remoteCache[name] end
+    
+    local low = name:lower()
     for _, o in ipairs(ReplicatedStorage:GetDescendants()) do
-        if o:IsA("RemoteEvent") or o:IsA("RemoteFunction") then
-            local n = o.Name:lower()
-            if n == low then remoteCache[name] = o; return o end
-            if not partial and n:find(low, 1, true) then partial = o end
+        if (o:IsA("RemoteEvent") or o:IsA("RemoteFunction")) and o.Name:lower() == low then
+            remoteCache[name] = o
+            return o
         end
     end
-    remoteCache[name] = partial
-    return partial
+    return nil
 end
 
 local function fireRemote(name, ...)
     local r, packed = resolveRemote(name), table.pack(...)
     if not r then return false end
-    task.spawn(function()
-        pcall(function()
-            if r:IsA("RemoteEvent") then r:FireServer(table.unpack(packed, 1, packed.n))
-            else r:InvokeServer(table.unpack(packed, 1, packed.n)) end
-        end)
+    local success, res = pcall(function()
+        if r:IsA("RemoteEvent") then
+            r:FireServer(table.unpack(packed, 1, packed.n))
+            return true
+        else
+            return r:InvokeServer(table.unpack(packed, 1, packed.n))
+        end
     end)
-    return true
+    if P.Flags.RemoteLog then
+        table.insert(P.Log, { Time = os.date("%H:%M:%S"), Remote = name, Success = success })
+    end
+    return success, res
 end
 
 local function moveTo(pos, timeout)
@@ -154,28 +213,34 @@ local function moveTo(pos, timeout)
     end
 end
 
--- Absolute Game Sound Eraser & Replacement Engine
+-- Bulletproof Feature Handlers
 local SoundMuteConnections = {}
-local function ToggleGameSoundMute(enable)
-    for _, conn in ipairs(SoundMuteConnections) do
-        if conn then conn:Disconnect() end
-    end
+local ToggleGameSoundMute = function(enable)
+    for _, conn in ipairs(SoundMuteConnections) do if conn then conn:Disconnect() end end
     SoundMuteConnections = {}
 
     local function muteObj(obj)
         if obj:IsA("Sound") then
             local n = obj.Name:lower()
             if n:find("keyboard") or n:find("type") or n:find("typing") or n:find("key") or n:find("click") then
-                pcall(function() obj.Volume = enable and 0 or 0.5 end)
+                pcall(function()
+                    if enable then
+                        if Orig.SoundVolumes[obj] == nil then Orig.SoundVolumes[obj] = obj.Volume end
+                        obj.Volume = 0
+                    else
+                        if Orig.SoundVolumes[obj] ~= nil then
+                            obj.Volume = Orig.SoundVolumes[obj]
+                            Orig.SoundVolumes[obj] = nil
+                        end
+                    end
+                end)
             end
         end
     end
 
     for _, v in ipairs(Workspace:GetDescendants()) do muteObj(v) end
     for _, v in ipairs(SoundService:GetDescendants()) do muteObj(v) end
-    if LP.Character then
-        for _, v in ipairs(LP.Character:GetDescendants()) do muteObj(v) end
-    end
+    if LP.Character then for _, v in ipairs(LP.Character:GetDescendants()) do muteObj(v) end end
 
     if enable then
         table.insert(SoundMuteConnections, Workspace.DescendantAdded:Connect(muteObj))
@@ -184,25 +249,97 @@ local function ToggleGameSoundMute(enable)
             table.insert(SoundMuteConnections, char.DescendantAdded:Connect(muteObj))
             for _, v in ipairs(char:GetDescendants()) do muteObj(v) end
         end))
+    else
+        Orig.SoundVolumes = {}
     end
 end
 
-local function PlayMatchedSound(currentSpeed)
+local setFpsBoost = function(on)
+    pcall(function()
+        if Orig.LagReducerConn then
+            Orig.LagReducerConn:Disconnect()
+            Orig.LagReducerConn = nil
+        end
+
+        if on then
+            if UserGameSettings then
+                if Orig.VisualStates.Quality == nil then Orig.VisualStates.Quality = UserGameSettings.SavedQualityLevel end
+                UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.Level01
+            end
+            if Orig.VisualStates.Shadows == nil then Orig.VisualStates.Shadows = Lighting.GlobalShadows end
+            if Orig.VisualStates.Brightness == nil then Orig.VisualStates.Brightness = Lighting.Brightness end
+            Lighting.GlobalShadows = false
+            Lighting.Brightness = 2
+
+            local function optimizeObj(v)
+                if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Smoke") then
+                    if Orig.VisualStates[v] == nil then Orig.VisualStates[v] = v.Enabled end
+                    v.Enabled = false
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    if Orig.VisualStates[v] == nil then Orig.VisualStates[v] = v.Transparency end
+                    v.Transparency = 1
+                end
+            end
+
+            for _, v in ipairs(Workspace:GetDescendants()) do optimizeObj(v) end
+            Orig.LagReducerConn = Workspace.DescendantAdded:Connect(optimizeObj)
+        else
+            if UserGameSettings and Orig.VisualStates.Quality then UserGameSettings.SavedQualityLevel = Orig.VisualStates.Quality end
+            if Orig.VisualStates.Shadows ~= nil then Lighting.GlobalShadows = Orig.VisualStates.Shadows end
+            if Orig.VisualStates.Brightness ~= nil then Lighting.Brightness = Orig.VisualStates.Brightness else Lighting.Brightness = 1 end
+
+            for k, originalState in pairs(Orig.VisualStates) do
+                if typeof(k) == "Instance" then
+                    if k:IsA("ParticleEmitter") or k:IsA("Trail") or k:IsA("Fire") or k:IsA("Sparkles") or k:IsA("Smoke") then
+                        pcall(function() k.Enabled = originalState end)
+                    elseif k:IsA("Decal") or k:IsA("Texture") then
+                        pcall(function() k.Transparency = originalState end)
+                    end
+                end
+            end
+            Orig.VisualStates = {}
+        end
+    end)
+end
+
+local setUncap = function(on)
+    if on then
+        if Orig.FpsCap == nil then Orig.FpsCap = safeGetFpsCap() end
+        safeFpsCap(999)
+    else
+        safeFpsCap(Orig.FpsCap or 60)
+        Orig.FpsCap = nil
+    end
+end
+
+local invisCache = setmetatable({}, { __mode = "k" })
+local setInvisible = function(on)
+    local c = LP.Character; if not c then return end
+    for _, d in ipairs(c:GetDescendants()) do
+        if (d:IsA("BasePart") and d.Name ~= "HumanoidRootPart") or d:IsA("Decal") then
+            if on then
+                if invisCache[d] == nil then invisCache[d] = d.Transparency end
+                d.Transparency = 1
+            else
+                if invisCache[d] ~= nil then
+                    d.Transparency = invisCache[d]
+                    invisCache[d] = nil
+                end
+            end
+        end
+    end
+end
+
+local PlayMatchedSound = function(currentSpeed)
     if not P.Flags.KeySounds then return end
     local soundId = SoundProfiles[SelectedSoundName] or SoundProfiles["Water Drop"]
     local sound = Instance.new("Sound")
     sound.SoundId = soundId
     sound.Volume = 0.95
-    
-    local speedRatio = math.clamp(currentSpeed / 16, 0.8, 3.5)
-    sound.Pitch = math.clamp(0.9 + (speedRatio * 0.12), 0.8, 1.5)
+    sound.Pitch = math.clamp(0.9 + ((math.clamp(currentSpeed / 16, 0.8, 3.5)) * 0.12), 0.8, 1.5)
     sound.Parent = SoundService
     sound:Play()
-
-    task.spawn(function()
-        sound.Ended:Wait()
-        sound:Destroy()
-    end)
+    task.spawn(function() sound.Ended:Wait(); sound:Destroy() end)
 end
 
 local soundTimer = 0
@@ -217,18 +354,14 @@ connect(RunService.Heartbeat, function(dt)
     if humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
         local currentSpeed = math.max(16, humanoid.WalkSpeed)
         local interval = math.clamp(2.2 / (currentSpeed ^ 0.7), 0.05, 0.28)
-
-        soundTimer = soundTimer + dt
-        if soundTimer >= interval then
-            soundTimer = 0
-            PlayMatchedSound(currentSpeed)
-        end
+        soundTimer += dt
+        if soundTimer >= interval then soundTimer = 0; PlayMatchedSound(currentSpeed) end
     else
         soundTimer = 0
     end
 end)
 
--- Eggs / Stealing Logic
+-- Robust Egg Tracking & Refined Predictor
 local RARITY = { common=1, uncommon=2, rare=3, epic=4, legendary=5, divine=6, secret=7, mythic=8 }
 local function rarityRank(name)
     local low, best = name:lower(), 0
@@ -236,13 +369,85 @@ local function rarityRank(name)
     return best
 end
 
+local function nameHasEgg(name) return name:lower():find("egg", 1, true) ~= nil end
+
+local function isInsideCharacter(inst)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        local character = plr.Character
+        if character and inst:IsDescendantOf(character) then return true end
+    end
+    return false
+end
+
+local function insideEggModel(inst)
+    local parent = inst.Parent
+    while parent and parent ~= Workspace do
+        if parent:IsA("Model") and nameHasEgg(parent.Name) then return true end
+        parent = parent.Parent
+    end
+    return false
+end
+
+local function isEgg(inst)
+    if not (inst:IsA("Model") or inst:IsA("BasePart")) then return false end
+    if not nameHasEgg(inst.Name) then return false end
+    if inst:IsA("Model") and Players:GetPlayerFromCharacter(inst) then return false end
+    if insideEggModel(inst) or isInsideCharacter(inst) then return false end
+    return true
+end
+
+local function getHistory(name)
+    local history = P.EggHistory[name]
+    if not history then
+        history = { Spawn = {}, Despawn = {}, Present = 0 }
+        P.EggHistory[name] = history
+    end
+    return history
+end
+
+local function addTimestamp(list)
+    local now = os.clock()
+    if #list > 0 and now - list[#list] < 1.5 then return end -- Filter rapid noise
+    table.insert(list, now)
+    if #list > 12 then table.remove(list, 1) end
+end
+
+local function recordSpawn(inst)
+    if not isEgg(inst) then return end
+    local history = getHistory(inst.Name)
+    history.Present += 1
+    P.EggCount += 1
+    addTimestamp(history.Spawn)
+end
+
+local function recordDespawn(inst)
+    if not isEgg(inst) then return end
+    local history = getHistory(inst.Name)
+    history.Present = math.max(0, history.Present - 1)
+    P.EggCount = math.max(0, P.EggCount - 1)
+    addTimestamp(history.Despawn)
+end
+
+local function resyncEggs()
+    table.clear(P.EggHistory)
+    P.EggCache = {}
+    local count = 0
+    for _, inst in ipairs(Workspace:GetDescendants()) do
+        if isEgg(inst) then
+            getHistory(inst.Name).Present += 1
+            count += 1
+        end
+    end
+    P.EggCount = count
+    P.LastSync = os.clock()
+end
+
 local function scanEggs()
     if tick() - P.LastScan < 1 then return P.EggCache end
     local out = {}
     for _, o in ipairs(Workspace:GetDescendants()) do
-        if (o:IsA("Model") or o:IsA("BasePart")) and o.Name:lower():find("egg", 1, true)
-            and not (LP.Character and o:IsDescendantOf(LP.Character)) then
-            local skip = o:IsA("BasePart") and o.Parent and o.Parent:IsA("Model") and o.Parent.Name:lower():find("egg", 1, true)
+        if isEgg(o) then
+            local skip = o:IsA("BasePart") and o.Parent and o.Parent:IsA("Model") and nameHasEgg(o.Parent.Name)
             if not skip then
                 local part = o:IsA("Model") and (o.PrimaryPart or o:FindFirstChildWhichIsA("BasePart", true)) or o
                 if part then out[#out+1] = { object=o, part=part, name=o.Name, rarity=rarityRank(o.Name) } end
@@ -275,9 +480,9 @@ end
 
 local function sendWebhook(msg)
     local url = P.Flags.WebhookURL
-    if not (request and url:find("^https://")) then return end
+    if not (url and url:find("^https://")) then return end
     task.spawn(function()
-        pcall(request, { Url=url, Method="POST", Headers={ ["Content-Type"]="application/json" },
+        pcall(httpInvoke, { Url=url, Method="POST", Headers={ ["Content-Type"]="application/json" },
             Body=HttpService:JSONEncode({ content=msg }) })
     end)
 end
@@ -285,22 +490,12 @@ end
 local function GetMyPlot()
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then return nil end
-
     for _, plot in ipairs(plots:GetChildren()) do
         local owner = plot:FindFirstChild("Owner") or plot:FindFirstChild("OwnerValue") or plot:FindFirstChild("Player")
         if owner and owner:IsA("ValueBase") then
             local val = owner.Value
             if LP and (val == LP or val == LP.Name or val == LP.UserId or (typeof(val) == "Instance" and (val == LP or (val:IsA("Player") and val.Name == LP.Name)))) then
                 return plot
-            end
-        end
-        for _, desc in ipairs(plot:GetDescendants()) do
-            if desc:IsA("TextLabel") and LP then
-                local txt = desc.Text
-                local descName = desc.Name:lower()
-                if (descName:find("owner") or descName:find("name") or descName:find("title")) and (txt == LP.Name or txt == LP.DisplayName or txt:lower() == (LP.Name:lower() .. "'s plot")) then
-                    return plot
-                end
             end
         end
     end
@@ -314,23 +509,11 @@ local function GetSafeZoneCFrame()
         local treadmill = myPlot:FindFirstChild("TreadmillUpgrade") or myPlot:FindFirstChild("Treadmill")
         if treadmill then
             local base = treadmill:FindFirstChildWhichIsA("BasePart", true)
-            if base then 
-                P.Base = base.CFrame + Vector3.new(0, 4, 0)
-                return P.Base 
-            end
-        end
-        local plotBase = myPlot:FindFirstChildWhichIsA("BasePart")
-        if plotBase then 
-            P.Base = plotBase.CFrame + Vector3.new(0, 5, 0)
-            return P.Base 
+            if base then P.Base = base.CFrame + Vector3.new(0, 4, 0); return P.Base end
         end
     end
-    local char = LP.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        P.Base = root.CFrame
-        return P.Base
-    end
+    local root = getRoot()
+    if root then P.Base = root.CFrame; return P.Base end
     return CFrame.new(0, 10, 0)
 end
 
@@ -350,7 +533,7 @@ local function stealEgg(egg)
         local cd = egg.object:FindFirstChildWhichIsA("ClickDetector", true)
         if cd and fireclickdetector then fireclickdetector(cd) end
         fireRemote(P.Remotes.Steal, egg.object)
-        if P.Flags.WebhookAlert then sendWebhook(("**Brineland Hub** stole `%s` (rarity %d)"):format(egg.name, egg.rarity)) end
+        if P.Flags.WebhookAlert then sendWebhook(("**Brineland Hub V10** stole `%s` (rarity %d)"):format(egg.name, egg.rarity)) end
         if P.Flags.AutoReturn then
             local r2 = getRoot()
             if r2 then
@@ -362,84 +545,131 @@ local function stealEgg(egg)
     P.Stealing = false
 end
 
--- Predictors
-local function recordEgg(inst)
-    if not (inst:IsA("Model") or inst:IsA("BasePart")) then return end
-    local n = inst.Name
-    if not n:lower():find("egg", 1, true) then return end
-    if inst:IsA("BasePart") and inst.Parent and inst.Parent:IsA("Model") and inst.Parent.Name:lower():find("egg", 1, true) then return end
-    local h = P.EggHistory[n]
-    if not h then h = {}; P.EggHistory[n] = h end
+local function averageInterval(list)
+    if #list < 3 then return nil end
+    local total = 0
+    for i = 2, #list do total += list[i] - list[i - 1] end
+    return total / (#list - 1)
+end
+
+local function getPredictions()
+    local results, learning = {}, {}
     local now = os.clock()
-    if #h > 0 and now - h[#h] < 2 then return end
-    h[#h+1] = now
-    if #h > 12 then table.remove(h, 1) end
-end
-
-local function predictEggs()
-    local out, now = {}, os.clock()
-    for name, h in pairs(P.EggHistory) do
-        if #h >= 3 then
-            local sum = 0
-            for i = 2, #h do sum += h[i] - h[i-1] end
-            local avg = sum / (#h - 1)
-            out[#out+1] = { name = name, eta = math.max(0, h[#h] + avg - now), avg = avg }
+    for name, history in pairs(P.EggHistory) do
+        local series = history.Spawn
+        local average = averageInterval(series)
+        if not average then
+            series = history.Despawn
+            average = averageInterval(series)
+        end
+        if average then
+            table.insert(results, { Name = name, ETA = math.max(0, series[#series] + average - now), Average = average })
+        else
+            table.insert(learning, { Name = name, Seen = math.max(#history.Spawn, #history.Despawn) })
         end
     end
-    table.sort(out, function(a, b) return a.eta < b.eta end)
+    table.sort(results, function(a, b) return a.ETA < b.ETA end)
+    table.sort(learning, function(a, b) return a.Name < b.Name end)
+    return results, learning
+end
+
+local function predictionText()
+    local ready, learning = getPredictions()
     local lines = {}
-    for i, o in ipairs(out) do
-        if i > 6 then break end
-        lines[#lines+1] = ("%s in ~%ds (every ~%ds)"):format(o.name, math.floor(o.eta), math.floor(o.avg))
+    for i, item in ipairs(ready) do
+        if i > P.Flags.MaxPredictions then break end
+        table.insert(lines, ("%s: ~%ds (every ~%ds) (Est)"):format(item.Name, math.floor(item.ETA), math.floor(item.Average)))
     end
-    return lines
-end
-
-local function predictRifts()
-    local root, hints = getRoot(), {}
-    for _, o in ipairs(Workspace:GetDescendants()) do
-        local n = o.Name:lower()
-        if n:find("rift", 1, true) or n:find("portal", 1, true) then
-            local part = o:IsA("BasePart") and o or (o:IsA("Model") and o.PrimaryPart)
-            if part then hints[#hints+1] = { name=o.Name, d = root and (part.Position - root.Position).Magnitude or 0 } end
+    if P.Flags.ShowLearning then
+        for _, item in ipairs(learning) do
+            table.insert(lines, ("%s: learning (%d seen)"):format(item.Name, item.Seen))
         end
     end
-    table.sort(hints, function(a, b) return a.d < b.d end)
-    return hints
+    return #lines > 0 and table.concat(lines, "\n") or "Collecting observations..."
 end
 
 local function serverHop()
-    local ok, body = pcall(httpGet, ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100"):format(game.PlaceId))
-    if ok and body then
-        local good = {}
-        for _, s in ipairs(HttpService:JSONDecode(body).data or {}) do
-            if s.id ~= game.JobId and s.playing < s.maxPlayers then good[#good+1] = s.id end
-        end
-        if #good > 0 then
-            pcall(TeleportService.TeleportToPlaceInstance, TeleportService, game.PlaceId, good[math.random(#good)], LP)
-            return
+    local body = safeGet(("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100"):format(game.PlaceId))
+    if body then
+        local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
+        if ok and data and data.data then
+            local good = {}
+            for _, s in ipairs(data.data) do
+                if s.id ~= game.JobId and s.playing < s.maxPlayers then good[#good+1] = s.id end
+            end
+            if #good > 0 then
+                pcall(TeleportService.TeleportToPlaceInstance, TeleportService, game.PlaceId, good[math.random(#good)], LP)
+                return
+            end
         end
     end
     notify("Brineland", "No server found.")
 end
 
-local function saveCfg()
+local function validateConfig(data)
+    if type(data) ~= "table" then return nil end
+    local result = {}
+    for key, default in pairs(DEFAULT_FLAGS) do
+        local val = data[key]
+        if type(val) == type(default) then
+            if type(default) == "number" then
+                if key == "ESPDistance" then result[key] = math.clamp(val, 100, 20000)
+                elseif key == "MaxPredictions" then result[key] = math.clamp(math.floor(val), 1, 15)
+                elseif key == "ResyncInterval" then result[key] = math.clamp(math.floor(val), 5, 300)
+                elseif key == "HitRange" then result[key] = math.clamp(val, 1, 100)
+                elseif key == "Speed" then result[key] = math.clamp(val, 16, 500)
+                elseif key == "FlySpeed" then result[key] = math.clamp(val, 5, 500)
+                elseif key == "TreadmillTier" then result[key] = math.clamp(math.floor(val), 1, 50)
+                elseif key == "HopThreshold" then result[key] = math.clamp(math.floor(val), 0, 30)
+                elseif key == "StealDelay" then result[key] = math.clamp(val, 0.05, 10)
+                else result[key] = val end
+            elseif type(default) == "string" then
+                if key == "WebhookURL" then
+                    result[key] = (type(val) == "string" and val:find("^https://")) and val or ""
+                else
+                    result[key] = tostring(val)
+                end
+            else
+                result[key] = val
+            end
+        else
+            result[key] = default
+        end
+    end
+    return result
+end
+
+local setStatus = function(_) end
+
+local function saveConfig()
+    if type(writefile) ~= "function" then setStatus("Saving not supported."); return false end
     local flags = {}
     for k, v in pairs(P.Flags) do if not VOLATILE[k] then flags[k] = v end end
-    local ok = pcall(function() writefile(CFG_FILE, HttpService:JSONEncode({ Flags=flags, Remotes=P.Remotes })) end)
-    notify("Brineland", ok and "Config saved." or "Save not supported.")
+    local ok = safe("config:save", function() writefile(CFG_FILE, HttpService:JSONEncode({ Flags=flags, Remotes=P.Remotes })) end)
+    setStatus(ok and "Config saved." or "Save failed.")
+    return ok
 end
 
-local function loadCfg(silent)
-    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(CFG_FILE)) end)
-    if not ok or type(data) ~= "table" then if not silent then notify("Brineland", "No config found.") end return end
-    for k, v in pairs(data.Flags or {}) do if P.Flags[k] ~= nil and type(v) == type(P.Flags[k]) and not VOLATILE[k] then P.Flags[k] = v end end
+local function loadConfig(silent)
+    if type(readfile) ~= "function" then return false end
+    if type(isfile) == "function" and not isfile(CFG_FILE) then return false end
+    local ok, data = safe("config:read", function() return HttpService:JSONDecode(readfile(CFG_FILE)) end)
+    if not ok or type(data) ~= "table" then if not silent then notify("Brineland", "No config found.") end return false end
+    local flags = validateConfig(data.Flags)
+    if flags then P.Flags = flags end
     for k, v in pairs(data.Remotes or {}) do if P.Remotes[k] ~= nil and type(v) == "string" then P.Remotes[k] = v end end
+    
+    pcall(function() setFpsBoost(P.Flags.LagReducer) end)
+    pcall(function() setUncap(P.Flags.UncapFPS) end)
+    pcall(function() setInvisible(P.Flags.Invisible) end)
+    pcall(function() ToggleGameSoundMute(P.Flags.KeySounds) end)
+
     for _, fn in pairs(P.Refresh) do pcall(fn) end
-    if not silent then notify("Brineland", "Config loaded.") end
+    if not silent then notify("Brineland", "Config loaded & applied.") end
+    return true
 end
 
--- UI Construction matching Brineland Standard Style
+-- UI Construction with Safe GUI Parent Selection
 local T = {
     bg=Color3.fromRGB(14, 11, 25), side=Color3.fromRGB(10, 8, 18), card=Color3.fromRGB(22, 18, 45),
     hover=Color3.fromRGB(35, 28, 65), accent=Color3.fromRGB(0, 229, 255), text=Color3.fromRGB(255, 255, 255),
@@ -454,12 +684,17 @@ local function new(class, props, parent)
 end
 
 local function round(o, r) new("UICorner", { CornerRadius = UDim.new(0, r or 6) }, o) end
-local function guiParent() return (gethui and gethui()) or CoreGui or LP:WaitForChild("PlayerGui") end
+local function guiParent() 
+    local ok, res = pcall(function() return gethui and gethui() end)
+    if ok and res then return res end
+    return CoreGui or LP:WaitForChild("PlayerGui") 
+end
+
 local function isPointer(i) return i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch end
 local function isMove(i) return i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch end
 
 local function makeGui(name, order)
-    local g = new("ScreenGui", { Name=name, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, DisplayOrder=order }, guiParent())
+    local g = new("ScreenGui", { Name=name, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, DisplayOrder=order, IgnoreGuiInset=true }, guiParent())
     table.insert(P.Guis, g)
     return g
 end
@@ -480,19 +715,19 @@ local function makeDraggable(handle, target)
 end
 
 local function createWindow(title)
-    local gui = makeGui("BrinelandStealAnEggHub", 999)
-    local main = new("Frame", { Size=UDim2.fromOffset(360, 430), Position=UDim2.new(0.5,-180,0.5,-215),
+    local gui = makeGui("BrinelandStealAnEggHubV10", 999)
+    local main = new("Frame", { Size=UDim2.fromOffset(560, 420), Position=UDim2.new(0.5,-280,0.5,-210),
         BackgroundColor3=T.bg, BackgroundTransparency=0.18, BorderSizePixel=0 }, gui)
     round(main, 10)
     new("UIStroke", { Color=T.accent, Thickness=1.5 }, main)
     local vp = Workspace.CurrentCamera.ViewportSize
-    new("UIScale", { Scale = math.clamp(math.min(vp.X / 420, vp.Y / 480), 0.6, 1) }, main)
+    new("UIScale", { Scale = math.clamp(math.min(vp.X / 600, vp.Y / 450), 0.5, 1) }, main)
 
     local top = new("Frame", { Size=UDim2.new(1,0,0,40), BackgroundColor3=T.side, BackgroundTransparency=0.25, BorderSizePixel=0 }, main)
     round(top, 10)
     
     new("TextLabel", { Size=UDim2.new(1,-85,1,0), Position=UDim2.fromOffset(10,0), BackgroundTransparency=1,
-        Text="<b>BRINELAND</b> <font color=\"#00E5FF\">STEAL AN EGG</font>",
+        Text="<b>BRINELAND & PASCUA</b> <font color=\"#00E5FF\">V10.0 BULLETPROOF</font>",
         TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=12, RichText=true, TextXAlignment=Enum.TextXAlignment.Left }, top)
 
     local function topBtn(txt, x, fn, col)
@@ -504,8 +739,7 @@ local function createWindow(title)
     topBtn("<b>–</b>", -64, function() main.Visible = not main.Visible end, Color3.fromRGB(45,40,80))
     makeDraggable(top, main)
 
-    -- Floating Toggle Hub Button
-    local tgui = makeGui("BrinelandToggleBtn", 998)
+    local tgui = makeGui("BrinelandToggleBtnV10", 998)
     local tb = new("TextButton", { Size=UDim2.fromOffset(45,45), Position=UDim2.new(0,15,0.5,-22), BackgroundColor3=T.side,
         Text="<b><font color=\"#00E5FF\">HUB</font></b>", TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=12, RichText=true, AutoButtonColor=true }, tgui)
     round(tb, 22); new("UIStroke", { Color=T.accent, Thickness=1.5 }, tb)
@@ -544,7 +778,7 @@ local function createWindow(title)
     end
 
     function win:Tab(name)
-        local btn = new("TextButton", { Size=UDim2.new(0.24,0,1,0), BackgroundColor3=Color3.fromRGB(24, 18, 42), BackgroundTransparency=0.3,
+        local btn = new("TextButton", { Size=UDim2.new(0, 75, 1, 0), BackgroundColor3=Color3.fromRGB(24, 18, 42), BackgroundTransparency=0.3,
             Text="<b>" .. name .. "</b>", TextColor3=T.dim, Font=Enum.Font.GothamBold, TextSize=10, RichText=true, LayoutOrder=#tabs + 1 }, tabbar)
         round(btn, 6)
 
@@ -572,7 +806,7 @@ local function createWindow(title)
                 Font=Enum.Font.GothamBold, TextSize=11, RichText=true, TextXAlignment=Enum.TextXAlignment.Left }, container)
             new("UIPadding", { PaddingLeft=UDim.new(0,4) }, f)
         end
-        function t:Label(txt) local r = row(28); label(r, txt, 11, T.dim) end
+        function t:Label(txt) local r = row(28); return label(r, txt, 11, T.dim) end
         function t:Toggle(txt, key, cb)
             local r = row(40)
             local b = new("TextButton", { Size=UDim2.new(1,0,1,0), BackgroundTransparency=1, Text="" }, r)
@@ -593,7 +827,7 @@ local function createWindow(title)
         function t:Button(txt, cb, color)
             local b = new("TextButton", { Size=UDim2.new(1,-4,0,38), BackgroundColor3=color or Color3.fromRGB(35,28,65), LayoutOrder=nxt(), Text="<b>" .. txt .. "</b>",
                 TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=11, RichText=true }, container)
-            round(b, 6); connect(b.MouseButton1Click, function() pcall(cb) end)
+            round(b, 6); connect(b.MouseButton1Click, function() safe("btn:"..txt, cb) end)
         end
         function t:Slider(txt, key, min, max, step, cb)
             local r = row(44)
@@ -635,7 +869,7 @@ local function createWindow(title)
             local r = row(40)
             local lbl = new("TextLabel", { Size=UDim2.new(0.5,0,1,0), Position=UDim2.fromOffset(10,0), BackgroundTransparency=1,
                 Text="<b>" .. txt .. "</b>", TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=11, RichText=true, TextXAlignment=Enum.TextXAlignment.Left }, r)
-            local box = new("TextBox", { Size=UDim2.fromOffset(90,24), Position=UDim2.new(1,-96,0.5,-12), BackgroundColor3=Color3.fromRGB(35,28,65),
+            local box = new("TextBox", { Size=UDim2.fromOffset(110,24), Position=UDim2.new(1,-116,0.5,-12), BackgroundColor3=Color3.fromRGB(35,28,65),
                 Text=tostring(get()), TextColor3=T.accent, Font=Enum.Font.GothamBold, TextSize=11, ClearTextOnFocus=false }, r)
             round(box, 4)
             P.Refresh["i_" .. txt] = function() box.Text = tostring(get()) end
@@ -646,70 +880,10 @@ local function createWindow(title)
     return win
 end
 
--- Features Implementation
-local function setFpsBoost(on)
-    pcall(function()
-        if on then
-            UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.Level01
-            Lighting.GlobalShadows = false
-            Lighting.Brightness = 2
-            for _, v in ipairs(Workspace:GetDescendants()) do
-                if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Smoke") then
-                    v.Enabled = false
-                elseif v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 1
-                end
-            end
-        else
-            UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.Level21
-            Lighting.GlobalShadows = true
-        end
-    end)
-end
-
-local function setUncap(on)
-    if not setfpscap then return end
-    if on then
-        if Orig.FpsCap == nil then Orig.FpsCap = (getfpscap and getfpscap()) or 60 end
-        setfpscap(999)
-    else
-        setfpscap(Orig.FpsCap or 60); Orig.FpsCap = nil
-    end
-end
-
-local invisCache = setmetatable({}, { __mode = "k" })
-local function setInvisible(on)
-    local c = LP.Character; if not c then return end
-    for _, d in ipairs(c:GetDescendants()) do
-        if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then
-            if on then invisCache[d] = invisCache[d] or d.Transparency; d.Transparency = 1
-            elseif invisCache[d] then d.Transparency = invisCache[d]; invisCache[d] = nil end
-        elseif d:IsA("Decal") then
-            if on then invisCache[d] = invisCache[d] or d.Transparency; d.Transparency = 1
-            elseif invisCache[d] then d.Transparency = invisCache[d]; invisCache[d] = nil end
-        end
-    end
-end
-
-local collideCache = setmetatable({}, { __mode = "k" })
-local function setCollide(part, on)
-    if on then
-        local o = collideCache[part]
-        if o ~= nil then part.CanCollide = o; collideCache[part] = nil end
-    else
-        if collideCache[part] == nil then collideCache[part] = part.CanCollide end
-        part.CanCollide = false
-    end
-end
-local function restoreCollide()
-    for part, o in pairs(collideCache) do pcall(function() part.CanCollide = o end); collideCache[part] = nil end
-end
-
 local function restoreCharacter()
     local c = LP.Character
     local root = c and c:FindFirstChild("HumanoidRootPart")
     local bv = root and root:FindFirstChild("PascuaFly"); if bv then bv:Destroy() end
-    restoreCollide()
     setInvisible(false)
     local h = getHum()
     if h then
@@ -748,9 +922,9 @@ local function installPlayerHooks()
     connect(RunService.Stepped, function()
         if P.Flags.Noclip and LP.Character then
             noclipWas = true
-            for _, p in ipairs(LP.Character:GetDescendants()) do if p:IsA("BasePart") then setCollide(p, false) end end
+            for _, p in ipairs(LP.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
         elseif noclipWas then
-            noclipWas = false; restoreCollide()
+            noclipWas = false
         end
     end)
     connect(UserInputService.JumpRequest, function()
@@ -764,7 +938,7 @@ local function installPlayerHooks()
         end
     end)
     connect(LP.CharacterAdded, function(char)
-        Orig.WalkSpeed = nil; P.SpeedTouched = false; P.RagdollOff = false
+        Orig.WalkSpeed = nil; P.SpeedTouched = false
         local r = char:WaitForChild("HumanoidRootPart", 10); if not r then return end
         task.wait(1)
         if not P.BaseLocked then P.Base = r.CFrame end
@@ -781,31 +955,46 @@ local function installPlayerHooks()
         if P.Running then pcall(TeleportService.TeleportToPlaceInstance, TeleportService, game.PlaceId, game.JobId, LP) end
         task.wait(10); reconnecting = false
     end
-    connect(GuiService.ErrorMessageChanged, function(msg) if msg ~= "" then rejoin("error message") end end)
+    connect(GuiService.ErrorMessageChanged, function(msg)
+        if msg ~= "" then
+            local low = msg:lower()
+            if low:find("disconnected") or low:find("shutdown") or low:find("kick") or low:find("teleport") then
+                rejoin("error prompt (" .. msg .. ")")
+            end
+        end
+    end)
     pcall(function()
         local overlay = CoreGui.RobloxPromptGui.promptOverlay
-        connect(overlay.ChildAdded, function(c) if c.Name == "ErrorPrompt" then rejoin("disconnect prompt") end end)
-    end)
-    connect(TeleportService.TeleportInitFailed, function()
-        if P.Flags.AutoReconnect and P.Running then pcall(TeleportService.Teleport, TeleportService, game.PlaceId, LP) end
+        connect(overlay.ChildAdded, function(c)
+            if c.Name == "ErrorPrompt" then
+                if P.Flags.AntiKick then
+                    pcall(function() c:Destroy() end)
+                else
+                    rejoin("disconnect prompt")
+                end
+            end
+        end)
     end)
 end
 
--- ESP Drawings
+-- Bulletproof ESP with Drawing API Availability Guard
 local function drawing(key)
     local d = P.Drawings[key]
-    if not d then
-        d = Drawing.new("Text"); d.Size = 14; d.Center = true; d.Outline = true; d.OutlineColor = Color3.new()
-        P.Drawings[key] = d
+    if not d and Drawing then
+        pcall(function()
+            d = Drawing.new("Text"); d.Size = 14; d.Center = true; d.Outline = true; d.OutlineColor = Color3.new()
+            P.Drawings[key] = d
+        end)
     end
     return d
 end
 
 local function espStep()
+    if not Drawing then return end
     local f, used = P.Flags, {}
     local root = getRoot()
     local cam = Workspace.CurrentCamera
-    if root and Drawing and (f.EggESP or f.PlayerESP or f.PenEggESP or f.EventESP) then
+    if root and (f.EggESP or f.PlayerESP or f.PenEggESP or f.EventESP) then
         local targets = {}
         if f.EggESP then
             for _, e in ipairs(scanEggs()) do
@@ -819,21 +1008,13 @@ local function espStep()
             end
         end
         if f.PenEggESP or f.EventESP then
-            if tick() - (P.EspScan or 0) > 2 then
-                P.EspScan, P.EspCache = tick(), {}
-                for _, o in ipairs(Workspace:GetDescendants()) do
-                    local n = o.Name:lower()
-                    local pen = o:IsA("Model") and n:find("pen", 1, true)
-                    local ev = n:find("rift", 1, true) or n:find("boss", 1, true) or n:find("event", 1, true)
-                    if pen or ev then
-                        local part = o:IsA("BasePart") and o or (o:IsA("Model") and (o.PrimaryPart or o:FindFirstChildWhichIsA("BasePart")))
-                        if part then P.EspCache[#P.EspCache+1] = { part, o.Name, pen and "pen" or "ev" } end
-                    end
-                end
-            end
-            for _, c in ipairs(P.EspCache or {}) do
-                if c[1].Parent and ((c[3] == "pen" and f.PenEggESP) or (c[3] == "ev" and f.EventESP)) then
-                    targets[#targets+1] = { c[1], c[2], c[3] == "pen" and Color3.fromRGB(80,200,255) or Color3.fromRGB(200,100,255) }
+            for _, o in ipairs(Workspace:GetChildren()) do
+                local n = o.Name:lower()
+                local isPen = f.PenEggESP and n:find("pen", 1, true)
+                local isEv = f.EventESP and (n:find("rift", 1, true) or n:find("boss", 1, true) or n:find("event", 1, true))
+                if isPen or isEv then
+                    local part = o:IsA("BasePart") and o or (o:IsA("Model") and (o.PrimaryPart or o:FindFirstChildWhichIsA("BasePart")))
+                    if part then targets[#targets+1] = { part, o.Name, isPen and Color3.fromRGB(80,200,255) or Color3.fromRGB(200,100,255) } end
                 end
             end
         end
@@ -841,12 +1022,14 @@ local function espStep()
             local d = (t[1].Position - root.Position).Magnitude
             if d <= f.ESPDistance then
                 local dr = drawing(t[1])
-                local sp, on = cam:WorldToViewportPoint(t[1].Position)
-                dr.Visible = on
-                if on then
-                    dr.Position = Vector2.new(sp.X, sp.Y); dr.Text = ("%s [%d]"):format(t[2], math.floor(d)); dr.Color = t[3]
+                if dr then
+                    local sp, on = cam:WorldToViewportPoint(t[1].Position)
+                    dr.Visible = on
+                    if on then
+                        dr.Position = Vector2.new(sp.X, sp.Y); dr.Text = ("%s [%d]"):format(t[2], math.floor(d)); dr.Color = t[3]
+                    end
+                    used[t[1]] = true
                 end
-                used[t[1]] = true
             end
         end
     end
@@ -858,11 +1041,17 @@ end
 -- Hub Initializer & UI Layout
 local function openHub()
     P.Running = true
-    local win = createWindow("Brineland Hub | Steal an Egg")
-    local Farm, Pred, Rift = win:Tab("Farm"), win:Tab("Predict"), win:Tab("Rift")
-    local Vis, Ply, Srv, Cfg = win:Tab("Visuals"), win:Tab("Player"), win:Tab("Server"), win:Tab("Config")
+    local win = createWindow("Brineland Hub V10.0")
+    local Farm = win:Tab("Farm")
+    local Pred = win:Tab("Predict")
+    local Rift = win:Tab("Rift")
+    local Vis  = win:Tab("Visuals")
+    local Ply  = win:Tab("Player")
+    local Srv  = win:Tab("Server")
+    local Cfg  = win:Tab("Config")
+    local Diag = win:Tab("Diag")
 
-    Farm:Section("Eggs")
+    Farm:Section("Eggs & Automation")
     Farm:Toggle("Auto Steal", "AutoSteal")
     Farm:Toggle("Instant Steal (Teleport)", "InstantSteal")
     Farm:Toggle("Auto Return to Base", "AutoReturn")
@@ -886,15 +1075,18 @@ local function openHub()
     Farm:Toggle("Auto Buy Trail", "AutoTrail")
     Farm:Toggle("Auto Claim Rewards", "AutoClaim")
 
+    Pred:Section("Predictor & Tracking")
     Pred:Toggle("Egg Spawn Predictor", "EggPredictor")
     Pred:Toggle("Egg Preview Card", "PreviewCard")
+    Pred:Toggle("Show Learning Entries", "ShowLearning")
+    Pred:Slider("Resync Interval (s)", "ResyncInterval", 5, 120, 5)
+    Pred:Slider("Max Predictions", "MaxPredictions", 1, 8, 1)
     Pred:Toggle("Webhook Alerts", "WebhookAlert")
     Pred:Input("Webhook URL", function() return P.Flags.WebhookURL end, function(v) P.Flags.WebhookURL = v end)
-    Pred:Button("🔮 Show Egg Predictions", function()
-        local e = predictEggs()
-        notify("Egg Predictor", #e > 0 and table.concat(e, "\n") or "Needs 3+ observed spawns per egg", 6)
-    end, Color3.fromRGB(0, 160, 240))
+    Pred:Button("🔮 Show Egg Predictions", function() notify("Egg Predictor", predictionText(), 6) end, Color3.fromRGB(0, 160, 240))
+    Pred:Button("Recount Eggs Now", function() resyncEggs(); notify("Predictor", "Recounted " .. P.EggCount .. " eggs.", 3) end)
 
+    Rift:Section("Rifts & Bosses")
     Rift:Toggle("Auto Rift Farm", "AutoRift")
     Rift:Toggle("Auto Rift Place", "AutoRiftPlace")
     Rift:Toggle("Auto Rift Trade", "AutoRiftTrade")
@@ -902,16 +1094,18 @@ local function openHub()
     Rift:Toggle("Wait at Last Pity", "WaitLastPity")
 
     if Drawing then
+        Vis:Section("ESP Settings")
         Vis:Toggle("Egg ESP", "EggESP")
         Vis:Toggle("Player ESP", "PlayerESP")
-        Vis:Toggle("Pen Egg ESP", "PenEggESP")
-        Vis:Toggle("Event ESP", "EventESP")
+        Vis:Toggle("Pen ESP", "PenEggESP")
+        Vis:Toggle("Event/Rift ESP", "EventESP")
         Vis:Slider("ESP Distance", "ESPDistance", 500, 10000, 100)
     else
         Vis:Label("ESP requires Drawing API.")
     end
     Vis:Dropdown("Min Rarity", "MinRarity", { "All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Divine", "Secret", "Mythic" })
 
+    Ply:Section("Movement & Character")
     Ply:Slider("WalkSpeed", "Speed", 16, 300, 1)
     Ply:Toggle("Fly", "Fly")
     Ply:Slider("Fly Speed", "FlySpeed", 10, 300, 5)
@@ -920,20 +1114,17 @@ local function openHub()
     Ply:Toggle("Keep HP Full", "GodMode")
     Ply:Toggle("Invisible", "Invisible", setInvisible)
     Ply:Toggle("Anti Ragdoll", "AntiRagdoll")
+    Ply:Toggle("Anti Kick Protection", "AntiKick")
 
-    -- Player Sound Replacement & Combat Tabs
     Ply:Section("Custom Sound & Combat Engine")
-    Ply:Toggle("Custom Key Sounds", "KeySounds", function(state)
-        ToggleGameSoundMute(state)
-    end)
+    Ply:Toggle("Custom Key Sounds", "KeySounds", function(state) ToggleGameSoundMute(state) end)
 
-    -- Sound Selector Dropdown
     local soundSelectorBtn = new("TextButton", { Size=UDim2.new(1,-4,0,38), BackgroundColor3=T.card, BackgroundTransparency=0.25, Text="<b>Sound Select: <font color=\"#00E5FF\">" .. SelectedSoundName .. "</font></b>", TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=11, RichText=true }, Ply.container)
     round(soundSelectorBtn, 6)
 
     local soundDropdownContainer = new("ScrollingFrame", { Size=UDim2.new(1,-4,0,110), BackgroundColor3=Color3.fromRGB(18, 14, 35), BackgroundTransparency=0.2, ScrollBarThickness=3, Visible=false }, Ply.container)
     round(soundDropdownContainer, 6)
-    local soundDropLayout = new("UIListLayout", { Padding=UDim.new(0, 4) }, soundDropdownContainer)
+    new("UIListLayout", { Padding=UDim.new(0, 4) }, soundDropdownContainer)
 
     for profileName, _ in pairs(SoundProfiles) do
         local sBtn = new("TextButton", { Size=UDim2.new(1,-6,0,30), BackgroundColor3=Color3.fromRGB(35, 28, 65), Text="<b>" .. profileName .. "</b>", TextColor3=Color3.fromRGB(220, 220, 240), Font=Enum.Font.GothamBold, TextSize=10, RichText=true }, soundDropdownContainer)
@@ -949,6 +1140,7 @@ local function openHub()
     Ply:Toggle("Auto Hit (Equipped Bat)", "AutoHit")
     Ply:Slider("Hit Range (Studs)", "HitRange", 1, 50, 1)
 
+    Srv:Section("Server & Performance")
     Srv:Toggle("Anti AFK", "AntiAFK")
     Srv:Toggle("Lag Reducer (FPS Boost)", "LagReducer", function(on) pcall(setFpsBoost, on) end)
     Srv:Toggle("Uncap FPS", "UncapFPS", function(on) pcall(setUncap, on) end)
@@ -957,30 +1149,58 @@ local function openHub()
     Srv:Toggle("Auto Reconnect", "AutoReconnect")
     Srv:Toggle("Auto Server Hop", "AutoHop")
     Srv:Slider("Hop if players ≤", "HopThreshold", 0, 10, 1)
+    Srv:Toggle("Remote Call Logging", "RemoteLog")
     Srv:Button("🔄 Server Hop", serverHop, Color3.fromRGB(0, 160, 240))
 
-    Cfg:Section("Profile & Remotes")
-    Cfg:Button("💾 Save Config", saveCfg, Color3.fromRGB(0, 160, 240))
-    Cfg:Button("📂 Load Config", loadCfg, Color3.fromRGB(35, 28, 65))
+    Cfg:Section("Configuration Management")
+    local ConfigStatus = Cfg:Label("Ready.")
+    setStatus = function(text) ConfigStatus.Text = text end
+    Cfg:Button("💾 Save Config", saveConfig, Color3.fromRGB(0, 160, 240))
+    Cfg:Button("📂 Load Config", function() if loadConfig() then for _, fn in pairs(P.Refresh) do pcall(fn) end end, Color3.fromRGB(35, 28, 65))
+    Cfg:Button("🔄 Reset Config", function()
+        for k, v in pairs(DEFAULT_FLAGS) do P.Flags[k] = v end
+        ToggleGameSoundMute(false)
+        setFpsBoost(false)
+        setUncap(false)
+        setInvisible(false)
+        table.clear(P.EggHistory)
+        resyncEggs()
+        for _, fn in pairs(P.Refresh) do pcall(fn) end
+        setStatus("Reset to absolute defaults & cleared state.")
+    end, Color3.fromRGB(220,35,70))
     Cfg:Input("Target Area", function() return P.Flags.TargetArea end, function(v) P.Flags.TargetArea = v end)
     Cfg:Input("Specific Egg", function() return P.Flags.SpecificEgg end, function(v) P.Flags.SpecificEgg = v end)
 
-    -- Setup Loops & Background Tasks
+    Diag:Section("Runtime Diagnostics & Errors")
+    local ErrorOutput = Diag:Label("No errors recorded.")
+    local function refreshDiagnostics()
+        local lines = {}
+        for _, key in ipairs(P.ErrorOrder) do
+            local e = P.Errors[key]
+            if e then table.insert(lines, ("[%s] %s x%d: %s"):format(e.Time, e.Tag, e.Count, e.Message)) end
+        end
+        ErrorOutput.Text = #lines > 0 and table.concat(lines, "\n") or "No errors recorded."
+    end
+    Diag:Button("Refresh Diagnostics", refreshDiagnostics)
+    Diag:Button("Clear Diagnostics", function() table.clear(P.Errors); table.clear(P.ErrorOrder); refreshDiagnostics() end)
+
     local r = getRoot(); if r then P.Base = r.CFrame end
     installPlayerHooks()
     hookHumanoid()
-    connect(Workspace.DescendantAdded, function(inst) if P.Flags.EggPredictor then recordEgg(inst) end end)
 
-    every(0.4, function()
+    connect(Workspace.DescendantAdded, function(inst) if P.Flags.EggPredictor then safe("predictor:spawn", recordSpawn, inst) end end)
+    connect(Workspace.DescendantRemoving, function(inst) if P.Flags.EggPredictor then safe("predictor:despawn", recordDespawn, inst) end end)
+
+    spawnTask("autosteal", 0.4, function()
         if P.Flags.AutoSteal and alive() and not P.Stealing then local e = closestEgg(); if e then stealEgg(e) end end
     end)
-    every(1, function()
+    spawnTask("treadmill", 1, function()
         local f, R = P.Flags, P.Remotes
         if f.AutoTreadmill then fireRemote(R.Treadmill) end
         if f.AutoUpgradeTread then for i = 1, f.TreadmillTier do fireRemote(R.Upgrade, i) end end
         if f.AutoUpgradeBase then fireRemote(R.UpgradeBase) end
     end)
-    every(1.5, function()
+    spawnTask("inventory", 1.5, function()
         local f, R = P.Flags, P.Remotes
         if f.AutoHatch then fireRemote(R.Hatch, args(f.HatchArg)) end
         if f.AutoPlace then fireRemote(R.Place) end
@@ -989,10 +1209,8 @@ local function openHub()
         if f.AutoFuse then fireRemote(R.Fuse) end
         if f.AutoFavorite then fireRemote(R.Favorite, args(f.FavArg)) end
     end)
-    every(5, function()
-        if P.Flags.AutoEquipBest then fireRemote(P.Remotes.EquipBest, args(P.Flags.EquipArg)) end
-    end)
-    every(2, function()
+    spawnTask("equipbest", 5, function() if P.Flags.AutoEquipBest then fireRemote(P.Remotes.EquipBest, args(P.Flags.EquipArg)) end end)
+    spawnTask("rifts", 2, function()
         local f, R = P.Flags, P.Remotes
         if f.AutoRift then fireRemote(R.Rift, args(f.RiftFarmArg)) end
         if f.AutoRiftPlace then fireRemote(R.Rift, args(f.RiftPlaceArg)) end
@@ -1000,41 +1218,33 @@ local function openHub()
         if f.AutoBoss then fireRemote(R.Boss, args(f.BossFarmArg)) end
         if f.WaitLastPity then fireRemote(R.Rift, args(f.PityArg)) end
     end)
-    every(5, function()
+    spawnTask("trails_claims", 5, function()
         if P.Flags.AutoTrail then fireRemote(P.Remotes.Treadmill, "BuyTrail") end
         if P.Flags.AutoClaim then fireRemote(P.Remotes.Claim, "All") end
     end)
-    every(10, function()
+    spawnTask("autohop", 10, function()
         if P.Flags.AutoHop and #Players:GetPlayers() - 1 <= P.Flags.HopThreshold and tick() - (P.LastHop or 0) > 30 then
             P.LastHop = tick(); serverHop()
         end
     end)
-
-    -- Auto Hit Combat Loop
-    every(0.08, function()
+    spawnTask("autohit", 0.15, function()
         if P.Flags.AutoHit then
             local char = LP.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local tool = char and char:FindFirstChildOfClass("Tool")
             if hrp and tool then
-                local targetFound = false
-                for _, obj in ipairs(Workspace:GetDescendants()) do
-                    if (obj:IsA("Model") and obj ~= char and obj:FindFirstChildOfClass("Humanoid")) or (obj.Name == "Hitbox" and obj.Parent ~= char and not obj:IsDescendantOf(char)) then
-                        local targetPart = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart")) or obj
-                        if targetPart and targetPart:IsA("BasePart") then
-                            if (targetPart.Position - hrp.Position).Magnitude <= P.Flags.HitRange then
-                                targetFound = true
-                                break
-                            end
-                        end
+                for _, obj in ipairs(Workspace:GetChildren()) do
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart"))
+                    if hum and part and obj ~= char and (part.Position - hrp.Position).Magnitude <= P.Flags.HitRange then
+                        tool:Activate()
+                        break
                     end
                 end
-                if targetFound then tool:Activate() end
             end
         end
     end)
-
-    every(0.2, function()
+    spawnTask("humanoid_updates", 0.2, function()
         local h, f = getHum(), P.Flags
         if h then
             if f.Speed > 16 then
@@ -1046,26 +1256,12 @@ local function openHub()
                 h.WalkSpeed = Orig.WalkSpeed or 16; P.SpeedTouched = false
             end
             if f.GodMode and h.Health > 0 then h.Health = h.MaxHealth end
-            if f.AntiRagdoll then
-                P.RagdollOff = true
-                h:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-                h:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-                for _, n in ipairs({ "Ragdoll", "Ragdolled" }) do
-                    if LP.Character:GetAttribute(n) then LP.Character:SetAttribute(n, false) end
-                end
-            elseif P.RagdollOff then
-                P.RagdollOff = false
-                h:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
-                h:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-            end
-        end
-        if f.AntiTrap and LP.Character then
-            for _, o in ipairs(LP.Character:GetDescendants()) do
-                if o:IsA("BasePart") and o.Name:lower():find("trap", 1, true) then setCollide(o, false) end
-            end
         end
     end)
-    every(0.25, espStep)
+    spawnTask("esp", 0.25, espStep)
+    spawnTask("predictor_resync", 1, function()
+        if os.clock() - P.LastSync >= P.Flags.ResyncInterval then resyncEggs() end
+    end)
 
     local frames, last, fps = 0, tick(), 0
     connect(RunService.RenderStepped, function()
@@ -1073,12 +1269,13 @@ local function openHub()
         if tick() - last >= 1 then fps, frames, last = frames, 0, tick() end
     end)
 
-    -- Floating Overlay (FPS/Ping)
-    local ogui = makeGui("BrinelandOverlay", 998)
+    -- Floating Overlay
+    local ogui = makeGui("BrinelandOverlayV10", 998)
     local ov = new("TextLabel", { Size=UDim2.fromOffset(110,34), Position=UDim2.new(0,15,0,75), BackgroundColor3=T.bg,
         BackgroundTransparency=0.2, Text="", TextColor3=T.accent, Font=Enum.Font.Code, TextSize=13, Visible=false, Active=true }, ogui)
     round(ov, 6); new("UIStroke", { Color=T.accent, Thickness=1 }, ov); makeDraggable(ov, ov)
-    every(0.5, function()
+    
+    spawnTask("overlay", 0.5, function()
         local parts = {}
         if P.Flags.FPSOverlay then parts[#parts+1] = "FPS  " .. fps end
         if P.Flags.PingOverlay then
@@ -1091,28 +1288,65 @@ local function openHub()
         ov.Size = UDim2.fromOffset(110, 10 + 16 * math.max(#parts, 1))
     end)
 
-    notify("Brineland Hub", "Steal an Egg loaded successfully!", 4)
+    -- Preview Card
+    local PreviewGui = makeGui("PascuaPreviewV10", 998)
+    local PreviewCard = new("Frame", { Size=UDim2.fromOffset(245, 100), Position=UDim2.new(1, -260, 0, 60), BackgroundColor3=T.bg, Visible=false }, PreviewGui)
+    round(PreviewCard, 8)
+    new("UIStroke", { Color = T.accent, Transparency = 0.5 }, PreviewCard)
+    makeDraggable(PreviewCard, PreviewCard)
+
+    new("TextLabel", { Size=UDim2.new(1, -15, 0, 25), Position=UDim2.fromOffset(8, 3), BackgroundTransparency=1, Text="EGG PREVIEW CARD", TextColor3=T.accent, Font=Enum.Font.GothamBold, TextSize=11, TextXAlignment=Enum.TextXAlignment.Left }, PreviewCard)
+    local PreviewText = new("TextLabel", { Size=UDim2.new(1, -16, 1, -32), Position=UDim2.fromOffset(8, 28), BackgroundTransparency=1, Text="Waiting...", TextColor3=T.text, Font=Enum.Font.Gotham, TextSize=11, TextWrapped=true, TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top }, PreviewCard)
+
+    spawnTask("preview", 1, function()
+        PreviewCard.Visible = P.Flags.PreviewCard
+        if not P.Flags.PreviewCard then return end
+        local ready, learning = getPredictions()
+        local lines = {
+            "Eggs detected: " .. tostring(P.EggCount),
+            "Predictions: " .. tostring(#ready),
+            "Learning: " .. tostring(#learning),
+        }
+        if ready[1] then table.insert(lines, string.format("Next: %s (~%ds)", ready[1].Name, math.floor(ready[1].ETA))) end
+        PreviewText.Text = table.concat(lines, "\n")
+    end)
+
+    notify("Brineland Hub V10", "Bulletproof Production Edition Active!", 4)
 end
 
 function P.Destroy()
     P.Running = false
     ToggleGameSoundMute(false)
+    setFpsBoost(false)
+    setUncap(false)
+    setInvisible(false)
+    
+    for _, conn in ipairs(SoundMuteConnections) do if conn then conn:Disconnect() end end
+    SoundMuteConnections = {}
+
     for _, th in ipairs(P.Tasks) do pcall(task.cancel, th) end
     table.clear(P.Tasks)
+    
     for _, c in ipairs(P.Conns) do pcall(function() c:Disconnect() end) end
     table.clear(P.Conns)
+    
     for _, d in pairs(P.Drawings) do pcall(function() d:Remove() end) end
     table.clear(P.Drawings)
+    
     for _, g in ipairs(P.Guis) do pcall(function() g:Destroy() end) end
     table.clear(P.Guis)
+    
     table.clear(P.Refresh)
+    table.clear(P.EggHistory)
+    table.clear(P.EggCache)
+    table.clear(remoteCache)
+    table.clear(invisCache)
+    
     pcall(restoreCharacter)
-    pcall(function() if P.Flags.FPSBoost then setFpsBoost(false) end end)
-    pcall(function() if P.Flags.UncapFPS then setUncap(false) end end)
-    for _, fn in ipairs(P.Cleanups) do pcall(fn) end
     table.clear(P.Cleanups)
     env.PascuaHub = nil
 end
 
-loadCfg(true)
+loadConfig(true)
+resyncEggs()
 openHub()
