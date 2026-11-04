@@ -1,5 +1,5 @@
 -- ==============================================================================
--- BRINELAND HUB: STEAL AN EGG V10.0 (BULLETPROOF PRODUCTION EDITION)
+-- BRINELAND HUB: STEAL AN EGG V10.2 (DEFINITIVE PRODUCTION MASTER)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- ==============================================================================
 
@@ -83,7 +83,7 @@ P.Remotes = {
 }
 
 local VOLATILE = { Fly=1, Noclip=1, Invisible=1, GodMode=1, InfiniteJump=1, FPSBoost=1, UncapFPS=1, RemoteLog=1, KeySounds=1, LagReducer=1 }
-local Orig = { SoundVolumes = {}, VisualStates = {}, LagReducerConn = nil, FpsCap = nil }
+local Orig = { SoundVolumes = {}, VisualStates = {}, Collisions = {}, LagReducerConn = nil, FpsCap = nil }
 
 -- Compatibility & Safe Wrappers
 local httpInvoke = (syn and syn.request) or (http and http.request) or request or function(t)
@@ -98,10 +98,7 @@ local function safeGet(url)
 end
 
 local function safeFpsCap(val)
-    local ok = pcall(function()
-        if setfpscap then setfpscap(val) end
-    end)
-    return ok
+    pcall(function() if setfpscap then setfpscap(val) end end)
 end
 
 local function safeGetFpsCap()
@@ -112,16 +109,19 @@ local function safeGetFpsCap()
     return ok and res or 60
 end
 
--- Diagnostics & Safe Execution
+-- Diagnostics & Safe Execution (Rolling Queue for Max Errors)
 local MAX_ERRORS = 50
 local function report(tag, err)
     local message = tostring(err)
     local key = tostring(tag) .. "|" .. message
     if P.Errors[key] then P.Errors[key].Count += 1; return end
-    if #P.ErrorOrder >= MAX_ERRORS then return end
+    if #P.ErrorOrder >= MAX_ERRORS then
+        local oldestKey = table.remove(P.ErrorOrder, 1)
+        P.Errors[oldestKey] = nil
+    end
     P.Errors[key] = { Tag = tostring(tag), Message = message, Count = 1, Time = os.date("%H:%M:%S") }
     table.insert(P.ErrorOrder, key)
-    warn("[Brineland V10] " .. tostring(tag) .. ": " .. message)
+    warn("[Brineland V10.2] " .. tostring(tag) .. ": " .. message)
 end
 
 local function safe(tag, callback, ...)
@@ -200,6 +200,7 @@ local function fireRemote(name, ...)
     end)
     if P.Flags.RemoteLog then
         table.insert(P.Log, { Time = os.date("%H:%M:%S"), Remote = name, Success = success })
+        if #P.Log > 200 then table.remove(P.Log, 1) end
     end
     return success, res
 end
@@ -213,7 +214,7 @@ local function moveTo(pos, timeout)
     end
 end
 
--- Bulletproof Feature Handlers
+-- Feature Handlers
 local SoundMuteConnections = {}
 local ToggleGameSoundMute = function(enable)
     for _, conn in ipairs(SoundMuteConnections) do if conn then conn:Disconnect() end end
@@ -289,7 +290,7 @@ local setFpsBoost = function(on)
             if Orig.VisualStates.Brightness ~= nil then Lighting.Brightness = Orig.VisualStates.Brightness else Lighting.Brightness = 1 end
 
             for k, originalState in pairs(Orig.VisualStates) do
-                if typeof(k) == "Instance" then
+                if typeof(k) == "Instance" and k.Parent then
                     if k:IsA("ParticleEmitter") or k:IsA("Trail") or k:IsA("Fire") or k:IsA("Sparkles") or k:IsA("Smoke") then
                         pcall(function() k.Enabled = originalState end)
                     elseif k:IsA("Decal") or k:IsA("Texture") then
@@ -361,7 +362,7 @@ connect(RunService.Heartbeat, function(dt)
     end
 end)
 
--- Robust Egg Tracking & Refined Predictor
+-- Egg Tracking & Predictor (Incremental Resync to Preserve History)
 local RARITY = { common=1, uncommon=2, rare=3, epic=4, legendary=5, divine=6, secret=7, mythic=8 }
 local function rarityRank(name)
     local low, best = name:lower(), 0
@@ -407,7 +408,7 @@ end
 
 local function addTimestamp(list)
     local now = os.clock()
-    if #list > 0 and now - list[#list] < 1.5 then return end -- Filter rapid noise
+    if #list > 0 and now - list[#list] < 1.5 then return end
     table.insert(list, now)
     if #list > 12 then table.remove(list, 1) end
 end
@@ -429,12 +430,10 @@ local function recordDespawn(inst)
 end
 
 local function resyncEggs()
-    table.clear(P.EggHistory)
     P.EggCache = {}
     local count = 0
     for _, inst in ipairs(Workspace:GetDescendants()) do
         if isEgg(inst) then
-            getHistory(inst.Name).Present += 1
             count += 1
         end
     end
@@ -521,7 +520,7 @@ local function stealEgg(egg)
     if not egg or P.Stealing then return end
     local root = getRoot(); if not root then return end
     P.Stealing = true
-    pcall(function()
+    local ok, err = pcall(function()
         local home = GetSafeZoneCFrame()
         if P.Flags.InstantSteal then root.CFrame = egg.part.CFrame + Vector3.new(0, 3, 0); task.wait(0.15)
         else moveTo(egg.part.Position, 15) end
@@ -533,7 +532,7 @@ local function stealEgg(egg)
         local cd = egg.object:FindFirstChildWhichIsA("ClickDetector", true)
         if cd and fireclickdetector then fireclickdetector(cd) end
         fireRemote(P.Remotes.Steal, egg.object)
-        if P.Flags.WebhookAlert then sendWebhook(("**Brineland Hub V10** stole `%s` (rarity %d)"):format(egg.name, egg.rarity)) end
+        if P.Flags.WebhookAlert then sendWebhook(("**Brineland Hub V10.2** stole `%s` (rarity %d)"):format(egg.name, egg.rarity)) end
         if P.Flags.AutoReturn then
             local r2 = getRoot()
             if r2 then
@@ -542,6 +541,7 @@ local function stealEgg(egg)
         end
         task.wait(P.Flags.StealDelay)
     end)
+    if not ok then report("stealEgg", err) end
     P.Stealing = false
 end
 
@@ -669,7 +669,7 @@ local function loadConfig(silent)
     return true
 end
 
--- UI Construction with Safe GUI Parent Selection
+-- UI Construction
 local T = {
     bg=Color3.fromRGB(14, 11, 25), side=Color3.fromRGB(10, 8, 18), card=Color3.fromRGB(22, 18, 45),
     hover=Color3.fromRGB(35, 28, 65), accent=Color3.fromRGB(0, 229, 255), text=Color3.fromRGB(255, 255, 255),
@@ -715,7 +715,7 @@ local function makeDraggable(handle, target)
 end
 
 local function createWindow(title)
-    local gui = makeGui("BrinelandStealAnEggHubV10", 999)
+    local gui = makeGui("BrinelandStealAnEggHubV10_2", 999)
     local main = new("Frame", { Size=UDim2.fromOffset(560, 420), Position=UDim2.new(0.5,-280,0.5,-210),
         BackgroundColor3=T.bg, BackgroundTransparency=0.18, BorderSizePixel=0 }, gui)
     round(main, 10)
@@ -727,7 +727,7 @@ local function createWindow(title)
     round(top, 10)
     
     new("TextLabel", { Size=UDim2.new(1,-85,1,0), Position=UDim2.fromOffset(10,0), BackgroundTransparency=1,
-        Text="<b>BRINELAND & PASCUA</b> <font color=\"#00E5FF\">V10.0 BULLETPROOF</font>",
+        Text="<b>BRINELAND & PASCUA</b> <font color=\"#00E5FF\">V10.2 PRODUCTION</font>",
         TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=12, RichText=true, TextXAlignment=Enum.TextXAlignment.Left }, top)
 
     local function topBtn(txt, x, fn, col)
@@ -739,7 +739,7 @@ local function createWindow(title)
     topBtn("<b>–</b>", -64, function() main.Visible = not main.Visible end, Color3.fromRGB(45,40,80))
     makeDraggable(top, main)
 
-    local tgui = makeGui("BrinelandToggleBtnV10", 998)
+    local tgui = makeGui("BrinelandToggleBtnV10_2", 998)
     local tb = new("TextButton", { Size=UDim2.fromOffset(45,45), Position=UDim2.new(0,15,0.5,-22), BackgroundColor3=T.side,
         Text="<b><font color=\"#00E5FF\">HUB</font></b>", TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=12, RichText=true, AutoButtonColor=true }, tgui)
     round(tb, 22); new("UIStroke", { Color=T.accent, Thickness=1.5 }, tb)
@@ -763,9 +763,7 @@ local function createWindow(title)
     local tabbar = new("Frame", { Size=UDim2.new(1,-12,0,32), Position=UDim2.new(0,6,0,44), BackgroundTransparency=1 }, main)
     new("UIListLayout", { FillDirection=Enum.FillDirection.Horizontal, Padding=UDim.new(0,3), SortOrder=Enum.SortOrder.LayoutOrder }, tabbar)
 
-    local holder = new("ScrollingFrame", { Size=UDim2.new(1,-12,1,-86), Position=UDim2.fromOffset(6,80), BackgroundTransparency=1,
-        BorderSizePixel=0, ScrollBarThickness=3, ScrollBarImageColor3=T.accent, CanvasSize=UDim2.new(), AutomaticCanvasSize=Enum.AutomaticSize.Y }, main)
-    new("UIListLayout", { Padding=UDim.new(0,6), SortOrder=Enum.SortOrder.LayoutOrder }, holder)
+    local holder = new("Frame", { Size=UDim2.new(1,-12,1,-86), Position=UDim2.fromOffset(6,80), BackgroundTransparency=1, BorderSizePixel=0 }, main)
 
     local win, tabs, active = { main = main }, {}, nil
     local function selectTab(t)
@@ -794,6 +792,7 @@ local function createWindow(title)
         if not active then selectTab(t) end
         local order = 0
         local function nxt() order += 1; return order end
+        t.nxt = nxt
 
         local function row(h) local f = new("Frame", { Size=UDim2.new(1,-4,0,h), BackgroundColor3=T.card, BackgroundTransparency=0.25, BorderSizePixel=0, LayoutOrder=nxt() }, container); round(f, 6); return f end
         local function label(parent, txt, size, color, align)
@@ -806,7 +805,15 @@ local function createWindow(title)
                 Font=Enum.Font.GothamBold, TextSize=11, RichText=true, TextXAlignment=Enum.TextXAlignment.Left }, container)
             new("UIPadding", { PaddingLeft=UDim.new(0,4) }, f)
         end
-        function t:Label(txt) local r = row(28); return label(r, txt, 11, T.dim) end
+        function t:Label(txt)
+            local r = new("Frame", { Size=UDim2.new(1,-4,0,28), AutomaticSize=Enum.AutomaticSize.Y, BackgroundColor3=T.card,
+                BackgroundTransparency=0.25, BorderSizePixel=0, LayoutOrder=nxt() }, container)
+            round(r, 6)
+            new("UIPadding", { PaddingTop=UDim.new(0,6), PaddingBottom=UDim.new(0,6), PaddingLeft=UDim.new(0,10), PaddingRight=UDim.new(0,10) }, r)
+            return new("TextLabel", { Size=UDim2.new(1,0,0,0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, Text=txt,
+                TextColor3=T.dim, Font=Enum.Font.GothamBold, TextSize=11, RichText=false, TextWrapped=true,
+                TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top }, r)
+        end
         function t:Toggle(txt, key, cb)
             local r = row(40)
             local b = new("TextButton", { Size=UDim2.new(1,0,1,0), BackgroundTransparency=1, Text="" }, r)
@@ -867,7 +874,7 @@ local function createWindow(title)
         end
         function t:Input(txt, get, set)
             local r = row(40)
-            local lbl = new("TextLabel", { Size=UDim2.new(0.5,0,1,0), Position=UDim2.fromOffset(10,0), BackgroundTransparency=1,
+            new("TextLabel", { Size=UDim2.new(0.5,0,1,0), Position=UDim2.fromOffset(10,0), BackgroundTransparency=1,
                 Text="<b>" .. txt .. "</b>", TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=11, RichText=true, TextXAlignment=Enum.TextXAlignment.Left }, r)
             local box = new("TextBox", { Size=UDim2.fromOffset(110,24), Position=UDim2.new(1,-116,0.5,-12), BackgroundColor3=Color3.fromRGB(35,28,65),
                 Text=tostring(get()), TextColor3=T.accent, Font=Enum.Font.GothamBold, TextSize=11, ClearTextOnFocus=false }, r)
@@ -900,8 +907,8 @@ local function hookHumanoid()
     connect(h.HealthChanged, function(hp)
         if P.Flags.GodMode and hp > 0 and hp < h.MaxHealth then h.Health = h.MaxHealth end
     end)
-    connect(h.StateChanged, function(_, new)
-        if P.Flags.AntiRagdoll and (new == Enum.HumanoidStateType.Ragdoll or new == Enum.HumanoidStateType.FallingDown) then
+    connect(h.StateChanged, function(_, newState)
+        if P.Flags.AntiRagdoll and (newState == Enum.HumanoidStateType.Ragdoll or newState == Enum.HumanoidStateType.FallingDown) then
             h:ChangeState(Enum.HumanoidStateType.GettingUp)
         end
     end)
@@ -918,15 +925,26 @@ local function installPlayerHooks()
             bv.Velocity = (hum.MoveDirection + Vector3.yAxis * up) * P.Flags.FlySpeed
         elseif bv then bv:Destroy() end
     end)
-    local noclipWas = false
+    
+    -- Robust Noclip hook with original collision caching & restoration
     connect(RunService.Stepped, function()
-        if P.Flags.Noclip and LP.Character then
-            noclipWas = true
-            for _, p in ipairs(LP.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-        elseif noclipWas then
-            noclipWas = false
+        if LP.Character then
+            for _, p in ipairs(LP.Character:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    if P.Flags.Noclip then
+                        if Orig.Collisions[p] == nil then Orig.Collisions[p] = p.CanCollide end
+                        p.CanCollide = false
+                    else
+                        if Orig.Collisions[p] ~= nil then
+                            p.CanCollide = Orig.Collisions[p]
+                            Orig.Collisions[p] = nil
+                        end
+                    end
+                end
+            end
         end
     end)
+
     connect(UserInputService.JumpRequest, function()
         if P.Flags.InfiniteJump then local h = getHum(); if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end end
     end)
@@ -939,6 +957,7 @@ local function installPlayerHooks()
     end)
     connect(LP.CharacterAdded, function(char)
         Orig.WalkSpeed = nil; P.SpeedTouched = false
+        Orig.Collisions = {}
         local r = char:WaitForChild("HumanoidRootPart", 10); if not r then return end
         task.wait(1)
         if not P.BaseLocked then P.Base = r.CFrame end
@@ -977,7 +996,7 @@ local function installPlayerHooks()
     end)
 end
 
--- Bulletproof ESP with Drawing API Availability Guard
+-- ESP (Drawing API guarded)
 local function drawing(key)
     local d = P.Drawings[key]
     if not d and Drawing then
@@ -994,7 +1013,7 @@ local function espStep()
     local f, used = P.Flags, {}
     local root = getRoot()
     local cam = Workspace.CurrentCamera
-    if root and (f.EggESP or f.PlayerESP or f.PenEggESP or f.EventESP) then
+    if root and cam and (f.EggESP or f.PlayerESP or f.PenEggESP or f.EventESP) then
         local targets = {}
         if f.EggESP then
             for _, e in ipairs(scanEggs()) do
@@ -1041,7 +1060,7 @@ end
 -- Hub Initializer & UI Layout
 local function openHub()
     P.Running = true
-    local win = createWindow("Brineland Hub V10.0")
+    local win = createWindow("Brineland Hub V10.2")
     local Farm = win:Tab("Farm")
     local Pred = win:Tab("Predict")
     local Rift = win:Tab("Rift")
@@ -1119,15 +1138,20 @@ local function openHub()
     Ply:Section("Custom Sound & Combat Engine")
     Ply:Toggle("Custom Key Sounds", "KeySounds", function(state) ToggleGameSoundMute(state) end)
 
-    local soundSelectorBtn = new("TextButton", { Size=UDim2.new(1,-4,0,38), BackgroundColor3=T.card, BackgroundTransparency=0.25, Text="<b>Sound Select: <font color=\"#00E5FF\">" .. SelectedSoundName .. "</font></b>", TextColor3=T.text, Font=Enum.Font.GothamBold, TextSize=11, RichText=true }, Ply.container)
+    local soundSelectorBtn = new("TextButton", { Size=UDim2.new(1,-4,0,38), BackgroundColor3=T.card, BackgroundTransparency=0.25,
+        Text="<b>Sound Select: <font color=\"#00E5FF\">" .. SelectedSoundName .. "</font></b>", TextColor3=T.text,
+        Font=Enum.Font.GothamBold, TextSize=11, RichText=true, LayoutOrder=Ply.nxt() }, Ply.container)
     round(soundSelectorBtn, 6)
 
-    local soundDropdownContainer = new("ScrollingFrame", { Size=UDim2.new(1,-4,0,110), BackgroundColor3=Color3.fromRGB(18, 14, 35), BackgroundTransparency=0.2, ScrollBarThickness=3, Visible=false }, Ply.container)
+    local soundDropdownContainer = new("ScrollingFrame", { Size=UDim2.new(1,-4,0,110), BackgroundColor3=Color3.fromRGB(18, 14, 35),
+        BackgroundTransparency=0.2, BorderSizePixel=0, ScrollBarThickness=3, CanvasSize=UDim2.new(),
+        AutomaticCanvasSize=Enum.AutomaticSize.Y, Visible=false, LayoutOrder=Ply.nxt() }, Ply.container)
     round(soundDropdownContainer, 6)
-    new("UIListLayout", { Padding=UDim.new(0, 4) }, soundDropdownContainer)
+    new("UIListLayout", { Padding=UDim.new(0, 4), SortOrder=Enum.SortOrder.Name }, soundDropdownContainer)
 
     for profileName, _ in pairs(SoundProfiles) do
-        local sBtn = new("TextButton", { Size=UDim2.new(1,-6,0,30), BackgroundColor3=Color3.fromRGB(35, 28, 65), Text="<b>" .. profileName .. "</b>", TextColor3=Color3.fromRGB(220, 220, 240), Font=Enum.Font.GothamBold, TextSize=10, RichText=true }, soundDropdownContainer)
+        local sBtn = new("TextButton", { Name=profileName, Size=UDim2.new(1,-6,0,30), BackgroundColor3=Color3.fromRGB(35, 28, 65),
+            Text="<b>" .. profileName .. "</b>", TextColor3=Color3.fromRGB(220, 220, 240), Font=Enum.Font.GothamBold, TextSize=10, RichText=true }, soundDropdownContainer)
         round(sBtn, 4)
         connect(sBtn.MouseButton1Click, function()
             SelectedSoundName = profileName
@@ -1156,15 +1180,17 @@ local function openHub()
     local ConfigStatus = Cfg:Label("Ready.")
     setStatus = function(text) ConfigStatus.Text = text end
     Cfg:Button("💾 Save Config", saveConfig, Color3.fromRGB(0, 160, 240))
-    Cfg:Button("📂 Load Config", function() if loadConfig() then for _, fn in pairs(P.Refresh) do pcall(fn) end end, Color3.fromRGB(35, 28, 65))
+    Cfg:Button("📂 Load Config", function()
+        if loadConfig() then
+            for _, fn in pairs(P.Refresh) do pcall(fn) end
+        end
+    end, Color3.fromRGB(35, 28, 65))
     Cfg:Button("🔄 Reset Config", function()
         for k, v in pairs(DEFAULT_FLAGS) do P.Flags[k] = v end
         ToggleGameSoundMute(false)
         setFpsBoost(false)
         setUncap(false)
         setInvisible(false)
-        table.clear(P.EggHistory)
-        resyncEggs()
         for _, fn in pairs(P.Refresh) do pcall(fn) end
         setStatus("Reset to absolute defaults & cleared state.")
     end, Color3.fromRGB(220,35,70))
@@ -1270,7 +1296,7 @@ local function openHub()
     end)
 
     -- Floating Overlay
-    local ogui = makeGui("BrinelandOverlayV10", 998)
+    local ogui = makeGui("BrinelandOverlayV10_2", 998)
     local ov = new("TextLabel", { Size=UDim2.fromOffset(110,34), Position=UDim2.new(0,15,0,75), BackgroundColor3=T.bg,
         BackgroundTransparency=0.2, Text="", TextColor3=T.accent, Font=Enum.Font.Code, TextSize=13, Visible=false, Active=true }, ogui)
     round(ov, 6); new("UIStroke", { Color=T.accent, Thickness=1 }, ov); makeDraggable(ov, ov)
@@ -1289,7 +1315,7 @@ local function openHub()
     end)
 
     -- Preview Card
-    local PreviewGui = makeGui("PascuaPreviewV10", 998)
+    local PreviewGui = makeGui("PascuaPreviewV10_2", 998)
     local PreviewCard = new("Frame", { Size=UDim2.fromOffset(245, 100), Position=UDim2.new(1, -260, 0, 60), BackgroundColor3=T.bg, Visible=false }, PreviewGui)
     round(PreviewCard, 8)
     new("UIStroke", { Color = T.accent, Transparency = 0.5 }, PreviewCard)
@@ -1311,7 +1337,7 @@ local function openHub()
         PreviewText.Text = table.concat(lines, "\n")
     end)
 
-    notify("Brineland Hub V10", "Bulletproof Production Edition Active!", 4)
+    notify("Brineland Hub V10.2", "Production Edition Active!", 4)
 end
 
 function P.Destroy()
