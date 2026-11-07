@@ -305,6 +305,7 @@ VerifyAndLoadHub()
 -- ============================================================
 local MarketplaceService = game:GetService("MarketplaceService")
 local PlaceId = game.PlaceId
+local GameId = game.GameId
 
 local success, info = pcall(function()
     return MarketplaceService:GetProductInfo(PlaceId)
@@ -2185,7 +2186,7 @@ elseif nameLower:find("steal an egg") or nameLower:find("stealanegg") or PlaceId
 elseif nameLower:find("speed keyboard escape") or nameLower:find("+1 speed") then
     print("[BRINELAND] Detected +1 Speed Keyboard Escape. Loading SpeedKeyboardEscape.lua...")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/SpeedKeyboardEscape.lua"))()
-elseif nameLower:find("bake or die") or nameLower:find("bakeordie") then
+elseif nameLower:find("bake or die") or nameLower:find("bakeordie") or PlaceId == 86479448397834 or GameId == 7488668004 then
     print("[BRINELAND] Detected Bake or Die. Loading bakeordiescript.lua...")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bakeordiescript.lua"))()
 else
