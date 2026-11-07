@@ -1304,7 +1304,7 @@ local function RunUniversalScript()
         FastInteract = false
     }
 
-    local Keybinds = {} -- Stores feature -> Enum.KeyCode
+    local Keybinds = {}
 
     local function SafeTeleport(targetCFrame)
         local char = LocalPlayer.Character
@@ -1531,7 +1531,6 @@ local function RunUniversalScript()
         end
     end
 
-    -- FIXED CLEAN VISION: Properly clears/restores original lighting & effects without blur
     local originalLighting = {
         Brightness = Lighting.Brightness,
         ClockTime = Lighting.ClockTime,
@@ -1694,7 +1693,7 @@ local function RunUniversalScript()
     local PlayersTab   = CreateTab("Player")
     local PlayerTab    = CreateTab("Cheats")
     local VisualsTab   = CreateTab("Visuals")
-    local KeyTab       = CreateTab("Key") -- NEW KEY TAB
+    local KeyTab       = CreateTab("Key")
 
     TabFrames["Teleports"].Container.Visible = true
     TabFrames["Teleports"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
@@ -2177,24 +2176,18 @@ end
 -- ============================================================
 local nameLower = gameName:lower()
 
-local BLOX_FRUITS_IDS = {
-    [2753915549] = true, -- First Sea
-    [4442272183] = true, -- Second Sea
-    [7449423635] = true, -- Third Sea
-}
-
 if nameLower:find("taxi boss") or PlaceId == 7305826609 then
     print("[BRINELAND] Detected Taxi Boss. Executing script...")
     RunTaxiBoss()
-elseif nameLower:find("steal an egg") or PlaceId == 115049386348611 then
+elseif nameLower:find("steal an egg") or nameLower:find("stealanegg") or PlaceId == 115049386348611 then
     print("[BRINELAND] Detected Steal An Egg. Executing script...")
     RunStealAnEgg()
 elseif nameLower:find("speed keyboard escape") or nameLower:find("+1 speed") then
     print("[BRINELAND] Detected +1 Speed Keyboard Escape. Loading SpeedKeyboardEscape.lua...")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/SpeedKeyboardEscape.lua"))()
-elseif BLOX_FRUITS_IDS[PlaceId] or nameLower:find("blox fruit") then
-    print("[BRINELAND] Detected Blox Fruits. Loading bloxfruits.lua...")
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bloxfruits.lua"))()
+elseif nameLower:find("bake or die") or nameLower:find("bakeordie") then
+    print("[BRINELAND] Detected Bake or Die. Loading bakeordiescript.lua...")
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bakeordiescript.lua"))()
 else
     print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
