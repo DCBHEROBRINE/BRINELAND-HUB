@@ -45,11 +45,12 @@ local GRINDER_COORDS = {
 }
 
 local TELEPORTS = {
-	{ "Hospital", Vector3.new(124, 19, 382) },
-	{ "Warehouse", Vector3.new(605, 51, 122) },
+	{ "Rat Boss", Vector3.new(124, 19, 382) },
+	{ "Gas Station", Vector3.new(605, 51, 122) },
 	{ "Bank", Vector3.new(947, 51, -127) },
-	{ "Zombie Grinder", Vector3.new(-14, 51, 110) },
-	{ "Items Grinder", Vector3.new(13, 51, 118) },
+	{ "Warehouse", Vector3.new(593, 52, 187) },
+	{ "Lab", Vector3.new(462, 52, -289) },
+	{ "Diner", Vector3.new(-25, 52, 108) },
 }
 
 -- State
