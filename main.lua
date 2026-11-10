@@ -45,7 +45,6 @@ local hostResponse = safeRequest({
     Method = "GET"
 });
 
--- Fixed condition (using 'and' instead of 'or' to avoid tautological bugs)
 if not hostResponse or (hostResponse.StatusCode ~= 200 and hostResponse.StatusCode ~= 429) then
     host = "https://api.platoboost.net";
 end
@@ -1292,7 +1291,7 @@ local function RunStealAnEgg()
 end
 
 -- ============================================================
--- SCRIPT 3: UNIVERSAL HUB (FALLBACK FOR OTHER GAMES)
+-- SCRIPT 3: UNIVERSAL HUB (FALLBACK / BAKES & OTHERS WITH UPGRADED FLY)
 -- ============================================================
 local function RunUniversalScript()
     local TweenService     = game:GetService("TweenService")
@@ -1301,11 +1300,16 @@ local function RunUniversalScript()
     local RunService       = game:GetService("RunService")
     local Lighting         = game:GetService("Lighting")
     local Players          = game:GetService("Players")
+    local CoreGui          = game:GetService("CoreGui")
     local LocalPlayer      = Players.LocalPlayer
+    local Camera           = Workspace.CurrentCamera
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     if PlayerGui:FindFirstChild("BrinelandUniversalHub") then
         PlayerGui.BrinelandUniversalHub:Destroy()
+    end
+    if PlayerGui:FindFirstChild("FlyMobileGUI") then
+        PlayerGui.FlyMobileGUI:Destroy()
     end
 
     local Config = {
@@ -1318,12 +1322,12 @@ local function RunUniversalScript()
         CleanVision  = false,
         AutoAim      = false,
         AutoAimRange = 60,
-        Gravity      = 196.2,
-        TweenSpeed   = 80,
         FastInteract = false
     }
 
     local Keybinds = {}
+    local moveConnections = {}
+    local mobileInputs = { Forward = false, Backward = false, Left = false, Right = false, Up = false, Down = false }
 
     local function SafeTeleport(targetCFrame)
         local char = LocalPlayer.Character
@@ -1344,7 +1348,7 @@ local function RunUniversalScript()
         if not hrp then return end
         pcall(function()
             local dist = (hrp.Position - targetCFrame.Position).Magnitude
-            local duration = math.max(0.1, dist / Config.TweenSpeed)
+            local duration = math.max(0.1, dist / 80)
             local tween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
             tween:Play()
         end)
@@ -1386,39 +1390,125 @@ local function RunUniversalScript()
         return closestPart
     end
 
-    local flyVelocity, flyGyro
+    -- Universal Bypassed Mobile/PC CFrame Fly Engine
+    local function GetFlightVector()
+        local vector = Vector3.new(0, 0, 0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) or mobileInputs.Forward then vector = vector + Vector3.new(0, 0, -1) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) or mobileInputs.Backward then vector = vector + Vector3.new(0, 0, 1) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) or mobileInputs.Left then vector = vector + Vector3.new(-1, 0, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) or mobileInputs.Right then vector = vector + Vector3.new(1, 0, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) or mobileInputs.Up then vector = vector + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or mobileInputs.Down then vector = vector + Vector3.new(0, -1, 0) end
+        return vector
+    end
 
     local function EnableFly()
         local char = LocalPlayer.Character
         if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum then return end
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not rootPart or not humanoid then return end
 
-        pcall(function()
-            flyVelocity = Instance.new("BodyVelocity")
-            flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-            flyVelocity.Velocity = Vector3.zero
-            flyVelocity.Parent = hrp
+        Config.FlyEnabled = true
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 
-            flyGyro = Instance.new("BodyGyro")
-            flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-            flyGyro.CFrame = hrp.CFrame
-            flyGyro.Parent = hrp
+        moveConnections.FlightLoop = RunService.Heartbeat:Connect(function(deltaTime)
+            if not Config.FlyEnabled or not rootPart or not char:IsDescendantOf(Workspace) then return end
+            rootPart.Velocity = Vector3.new(0, 0.1, 0)
 
-            hum.PlatformStand = true
+            local flightVector = GetFlightVector()
+            if flightVector.Magnitude > 0 then
+                local camCFrame = Camera.CFrame
+                local worldDirection = camCFrame:VectorToWorldSpace(flightVector)
+                if flightVector.Z ~= 0 then
+                    worldDirection = camCFrame.LookVector * -flightVector.Z
+                end
+                if flightVector.X ~= 0 then
+                    worldDirection = worldDirection + (camCFrame.RightVector * flightVector.X)
+                end
+                if flightVector.Y ~= 0 then
+                    worldDirection = worldDirection + Vector3.new(0, flightVector.Y, 0)
+                end
+                rootPart.CFrame = rootPart.CFrame + (worldDirection.Unit * Config.FlySpeed * deltaTime)
+            end
         end)
     end
 
     local function DisableFly()
-        if flyVelocity then flyVelocity:Destroy(); flyVelocity = nil end
-        if flyGyro then flyGyro:Destroy(); flyGyro = nil end
+        Config.FlyEnabled = false
+        if moveConnections.FlightLoop then
+            moveConnections.FlightLoop:Disconnect()
+            moveConnections.FlightLoop = nil
+        end
         local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.PlatformStand = false end
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
         end
     end
+
+    -- Floating Mobile Fly Buttons GUI
+    local FlyGui = Instance.new("ScreenGui")
+    FlyGui.Name = "FlyMobileGUI"
+    FlyGui.ResetOnSpawn = false
+    pcall(function()
+        FlyGui.Parent = (gethui and gethui()) or CoreGui
+    end)
+    if not FlyGui.Parent then
+        FlyGui.Parent = PlayerGui
+    end
+
+    local FlyToggleBtn = Instance.new("TextButton")
+    FlyToggleBtn.Size = UDim2.fromOffset(100, 40)
+    FlyToggleBtn.Position = UDim2.new(0.03, 0, 0.35, 0)
+    FlyToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 16, 35)
+    FlyToggleBtn.TextColor3 = Color3.fromRGB(225, 35, 65)
+    FlyToggleBtn.TextSize = 12
+    FlyToggleBtn.Font = Enum.Font.GothamBold
+    FlyToggleBtn.Text = "<b>FLY: OFF</b>"
+    FlyToggleBtn.RichText = true
+    FlyToggleBtn.Active = true
+    FlyToggleBtn.Draggable = true
+    FlyToggleBtn.Parent = FlyGui
+    Instance.new("UICorner", FlyToggleBtn).CornerRadius = UDim.new(0, 8)
+
+    FlyToggleBtn.MouseButton1Click:Connect(function()
+        if Config.FlyEnabled then
+            DisableFly()
+            FlyToggleBtn.Text = "<b>FLY: OFF</b>"
+            FlyToggleBtn.TextColor3 = Color3.fromRGB(225, 35, 65)
+        else
+            EnableFly()
+            FlyToggleBtn.Text = "<b>FLY: ON</b>"
+            FlyToggleBtn.TextColor3 = Color3.fromRGB(50, 255, 50)
+        end
+    end)
+
+    local UpBtn = Instance.new("TextButton")
+    UpBtn.Size = UDim2.fromOffset(42, 42)
+    UpBtn.Position = UDim2.new(0.9, 0, 0.55, 0)
+    UpBtn.BackgroundColor3 = Color3.fromRGB(20, 16, 35)
+    UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    UpBtn.TextSize = 16
+    UpBtn.Font = Enum.Font.GothamBold
+    UpBtn.Text = "▲"
+    UpBtn.Parent = FlyGui
+    Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(0, 8)
+    UpBtn.MouseButton1Down:Connect(function() mobileInputs.Up = true end)
+    UpBtn.MouseButton1Up:Connect(function() mobileInputs.Up = false end)
+
+    local DownBtn = Instance.new("TextButton")
+    DownBtn.Size = UDim2.fromOffset(42, 42)
+    DownBtn.Position = UDim2.new(0.9, 0, 0.67, 0)
+    DownBtn.BackgroundColor3 = Color3.fromRGB(20, 16, 35)
+    DownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DownBtn.TextSize = 16
+    DownBtn.Font = Enum.Font.GothamBold
+    DownBtn.Text = "▼"
+    DownBtn.Parent = FlyGui
+    Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(0, 8)
+    DownBtn.MouseButton1Down:Connect(function() mobileInputs.Down = true end)
+    DownBtn.MouseButton1Up:Connect(function() mobileInputs.Down = false end)
 
     RunService.Stepped:Connect(function()
         pcall(function()
@@ -1443,19 +1533,6 @@ local function RunUniversalScript()
 
     RunService.RenderStepped:Connect(function()
         pcall(function()
-            if Config.FlyEnabled and LocalPlayer.Character then
-                local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                if hrp and hum and flyVelocity and flyGyro then
-                    local cam = Workspace.CurrentCamera
-                    local moveDir = hum.MoveDirection
-                    local velocity = Vector3.zero
-                    if moveDir.Magnitude > 0 then velocity = (cam.CFrame.Rotation * moveDir).Unit * Config.FlySpeed end
-                    flyVelocity.Velocity = velocity
-                    flyGyro.CFrame = cam.CFrame
-                end
-            end
-
             if Config.AutoAim then
                 local target = GetNearestEnemyTarget(Config.AutoAimRange)
                 local cam = Workspace.CurrentCamera
@@ -1648,7 +1725,10 @@ local function RunUniversalScript()
     CloseBtn.TextSize = 13
     CloseBtn.RichText = true
     CloseBtn.Parent = TopBar
-    CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+    CloseBtn.MouseButton1Click:Connect(function()
+        FlyGui:Destroy()
+        ScreenGui:Destroy()
+    end)
 
     local TabBar = Instance.new("Frame")
     TabBar.Size = UDim2.new(1, -12, 0, 32)
@@ -2120,8 +2200,15 @@ local function RunUniversalScript()
     end)
     CreateSlider(PlayerTab, "Player Speed", 16, 300, Config.WalkSpeed, true, function(val) Config.WalkSpeed = val end)
     CreateToggle(PlayerTab, "Enable Fly", function(state)
-        Config.FlyEnabled = state
-        if state then EnableFly() else DisableFly() end
+        if state then
+            EnableFly()
+            FlyToggleBtn.Text = "<b>FLY: ON</b>"
+            FlyToggleBtn.TextColor3 = Color3.fromRGB(50, 255, 50)
+        else
+            DisableFly()
+            FlyToggleBtn.Text = "<b>FLY: OFF</b>"
+            FlyToggleBtn.TextColor3 = Color3.fromRGB(225, 35, 65)
+        end
     end)
     CreateSlider(PlayerTab, "Fly Speed", 10, 300, Config.FlySpeed, true, function(val) Config.FlySpeed = val end)
     CreateToggle(PlayerTab, "Noclip", function(state) Config.Noclip = state end)
@@ -2131,9 +2218,18 @@ local function RunUniversalScript()
     CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
     CreateToggle(VisualsTab, "Clean Vision (Fullbright & No Fog)", function(state) ToggleCleanVision(state) end)
 
-    -- KEYBINDS TAB (KEY CONFIGURATION SYSTEM)
+    -- KEYBINDS TAB
     local bindableActions = {
-        {Name = "Fly Toggle", Action = function() Config.FlyEnabled = not Config.FlyEnabled if Config.FlyEnabled then EnableFly() else DisableFly() end end},
+        {Name = "Fly Toggle", Action = function() 
+            if Config.FlyEnabled then DisableFly() else EnableFly() end 
+            if Config.FlyEnabled then
+                FlyToggleBtn.Text = "<b>FLY: ON</b>"
+                FlyToggleBtn.TextColor3 = Color3.fromRGB(50, 255, 50)
+            else
+                FlyToggleBtn.Text = "<b>FLY: OFF</b>"
+                FlyToggleBtn.TextColor3 = Color3.fromRGB(225, 35, 65)
+            end
+        end},
         {Name = "Noclip Toggle", Action = function() Config.Noclip = not Config.Noclip end},
         {Name = "Player ESP Toggle", Action = function() ToggleESPState(not Config.PlayerESP) end},
         {Name = "Clean Vision Toggle", Action = function() ToggleCleanVision(not Config.CleanVision) end},
@@ -2206,9 +2302,10 @@ elseif nameLower:find("speed keyboard escape") or nameLower:find("+1 speed") the
     local ok, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/SpeedKeyboardEscape.lua") end)
     if ok and res then loadstring(res)() end
 elseif nameLower:find("bake or die") or nameLower:find("bakeordie") or PlaceId == 86479448397834 or GameId == 7488668004 then
-    print("[BRINELAND] Detected Bake or Die. Loading bakeordie.lua...")
+    print("[BRINELAND] Detected Bake or Die. Loading bakeordie.lua & universal fly tools...")
     local ok, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bakeordie.lua") end)
     if ok and res then loadstring(res)() end
+    RunUniversalScript()
 else
     print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
