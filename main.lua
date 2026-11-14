@@ -2289,6 +2289,14 @@ end
 -- ============================================================
 -- GAME ROUTER EXECUTION
 -- ============================================================
+local MarketplaceService = game:GetService("MarketplaceService")
+local PlaceId = game.PlaceId
+local GameId = game.GameId
+
+local success, info = pcall(function()
+    return MarketplaceService:GetProductInfo(PlaceId)
+end)
+local gameName = (success and info and info.Name) or ""
 local nameLower = gameName:lower()
 
 if nameLower:find("taxi boss") or PlaceId == 7305826609 then
@@ -2297,6 +2305,10 @@ if nameLower:find("taxi boss") or PlaceId == 7305826609 then
 elseif nameLower:find("steal an egg") or nameLower:find("stealanegg") or PlaceId == 115049386348611 then
     print("[BRINELAND] Detected Steal An Egg. Executing script...")
     RunStealAnEgg()
+elseif nameLower:find("throw food for animals") or PlaceId == 120219252362013 or GameId == 10766972131 then
+    print("[BRINELAND] Detected Throw Food for Animals. Loading ThrowFoodForAnimals.lua...")
+    local ok, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/ThrowFoodForAnimals.lua") end)
+    if ok and res then loadstring(res)() end
 elseif nameLower:find("speed keyboard escape") or nameLower:find("+1 speed") then
     print("[BRINELAND] Detected +1 Speed Keyboard Escape. Loading SpeedKeyboardEscape.lua...")
     local ok, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/SpeedKeyboardEscape.lua") end)
