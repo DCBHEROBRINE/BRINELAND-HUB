@@ -1291,7 +1291,7 @@ local function RunStealAnEgg()
 end
 
 -- ============================================================
--- SCRIPT 3: UNIVERSAL HUB (FALLBACK / BAKES & OTHERS WITH UPGRADED FLY)
+-- SCRIPT 3: UNIVERSAL HUB (WITH INTEGRATED SERVER INFO & CONSOLE)
 -- ============================================================
 local function RunUniversalScript()
     local TweenService     = game:GetService("TweenService")
@@ -1301,6 +1301,8 @@ local function RunUniversalScript()
     local Lighting         = game:GetService("Lighting")
     local Players          = game:GetService("Players")
     local CoreGui          = game:GetService("CoreGui")
+    local Stats            = game:GetService("Stats")
+    local LogService       = game:GetService("LogService")
     local LocalPlayer      = Players.LocalPlayer
     local Camera           = Workspace.CurrentCamera
 
@@ -1310,6 +1312,13 @@ local function RunUniversalScript()
     end
     if PlayerGui:FindFirstChild("FlyMobileGUI") then
         PlayerGui.FlyMobileGUI:Destroy()
+    end
+
+    local hubAlive = true
+    local hubConns = {}
+    local function trackConn(c)
+        table.insert(hubConns, c)
+        return c
     end
 
     local Config = {
@@ -1510,7 +1519,7 @@ local function RunUniversalScript()
     DownBtn.MouseButton1Down:Connect(function() mobileInputs.Down = true end)
     DownBtn.MouseButton1Up:Connect(function() mobileInputs.Down = false end)
 
-    RunService.Stepped:Connect(function()
+    trackConn(RunService.Stepped:Connect(function()
         pcall(function()
             local char = LocalPlayer.Character
             if not char then return end
@@ -1529,17 +1538,7 @@ local function RunUniversalScript()
                 end
             end
         end)
-    end)
-
-    RunService.RenderStepped:Connect(function()
-        pcall(function()
-            if Config.AutoAim then
-                local target = GetNearestEnemyTarget(Config.AutoAimRange)
-                local cam = Workspace.CurrentCamera
-                if target and cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, target.Position) end
-            end
-        end)
-    end)
+    end))
 
     local ESPStorage = {}
     local function RemovePlayerESP(player)
@@ -1616,8 +1615,8 @@ local function RunUniversalScript()
     end
 
     for _, p in ipairs(Players:GetPlayers()) do CreatePlayerESP(p) end
-    Players.PlayerAdded:Connect(CreatePlayerESP)
-    Players.PlayerRemoving:Connect(RemovePlayerESP)
+    trackConn(Players.PlayerAdded:Connect(CreatePlayerESP))
+    trackConn(Players.PlayerRemoving:Connect(RemovePlayerESP))
 
     local function ToggleESPState(state)
         Config.PlayerESP = state
@@ -1663,6 +1662,9 @@ local function RunUniversalScript()
         end)
     end
 
+    -- ============================================================
+    -- MAIN GUI (UNCHANGED DIMENSIONS: 360x440)
+    -- ============================================================
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "BrinelandUniversalHub"
     ScreenGui.ResetOnSpawn = false
@@ -1726,6 +1728,9 @@ local function RunUniversalScript()
     CloseBtn.RichText = true
     CloseBtn.Parent = TopBar
     CloseBtn.MouseButton1Click:Connect(function()
+        hubAlive = false
+        for _, c in ipairs(hubConns) do pcall(function() c:Disconnect() end) end
+        DisableFly()
         FlyGui:Destroy()
         ScreenGui:Destroy()
     end)
@@ -1744,7 +1749,8 @@ local function RunUniversalScript()
     local TabFrames = {}
     local function CreateTab(tabName)
         local tabBtn = Instance.new("TextButton")
-        tabBtn.Size = UDim2.new(0.19, 0, 1, 0)
+        -- 6 tabs fit cleanly across the 348px TabBar width
+        tabBtn.Size = UDim2.new(0.162, 0, 1, 0)
         tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
         tabBtn.BackgroundTransparency = 0.3
         tabBtn.Text = "<b>" .. tabName .. "</b>"
@@ -1793,6 +1799,7 @@ local function RunUniversalScript()
     local PlayerTab    = CreateTab("Cheats")
     local VisualsTab   = CreateTab("Visuals")
     local KeyTab       = CreateTab("Key")
+    local InfoTab      = CreateTab("Info")
 
     TabFrames["Teleports"].Container.Visible = true
     TabFrames["Teleports"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
@@ -1825,13 +1832,13 @@ local function RunUniversalScript()
             dragging = true; dragStart = input.Position; startPos = MainFrame.Position
         end
     end)
-    UserInputService.InputChanged:Connect(function(input)
+    trackConn(UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
-    end)
-    UserInputService.InputEnded:Connect(function() dragging = false end)
+    end))
+    trackConn(UserInputService.InputEnded:Connect(function() dragging = false end))
 
     local function CreateButton(parentContainer, text, callback)
         local frame = Instance.new("Frame")
@@ -1960,17 +1967,17 @@ local function RunUniversalScript()
             end
         end)
 
-        UserInputService.InputChanged:Connect(function(input)
+        trackConn(UserInputService.InputChanged:Connect(function(input)
             if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 UpdateValue(input)
             end
-        end)
+        end))
 
-        UserInputService.InputEnded:Connect(function(input)
+        trackConn(UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 sliding = false
             end
-        end)
+        end))
     end
 
     -- TELEPORTS TAB
@@ -2116,8 +2123,8 @@ local function RunUniversalScript()
     end
 
     RefreshPlayerDropdown()
-    Players.PlayerAdded:Connect(RefreshPlayerDropdown)
-    Players.PlayerRemoving:Connect(RefreshPlayerDropdown)
+    trackConn(Players.PlayerAdded:Connect(RefreshPlayerDropdown))
+    trackConn(Players.PlayerRemoving:Connect(RefreshPlayerDropdown))
 
     selectorBtn.MouseButton1Click:Connect(function()
         dropdownContainer.Visible = not dropdownContainer.Visible
@@ -2274,7 +2281,7 @@ local function RunUniversalScript()
             bindBtn.Text = "<b>[...]</b>"
         end)
 
-        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        trackConn(UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if listening and input.UserInputType == Enum.UserInputType.Keyboard then
                 listening = false
                 Keybinds[item.Name] = input.KeyCode
@@ -2282,8 +2289,525 @@ local function RunUniversalScript()
             elseif not gameProcessed and Keybinds[item.Name] and input.KeyCode == Keybinds[item.Name] then
                 pcall(item.Action)
             end
+        end))
+    end
+
+    -- ============================================================
+    -- INFO TAB: SERVER TELEMETRY & LIVE CONSOLE (NO PLAYER PROFILE)
+    -- ============================================================
+    local MAX_LOGS = 200
+    local LOG_KIND = {
+        OUTPUT = { color = Color3.fromRGB(245, 247, 255), hex = "#E6EAFF", label = "OUTPUT" },
+        INFO   = { color = Color3.fromRGB(0, 229, 255),   hex = "#38E1FF", label = "INFO" },
+        WARN   = { color = Color3.fromRGB(255, 200, 75),  hex = "#FFC84B", label = "WARN" },
+        ERROR  = { color = Color3.fromRGB(255, 85, 110),  hex = "#FF5570", label = "ERROR" },
+    }
+    local LOG_FILTERS = { "ALL", "OUTPUT", "INFO", "WARN", "ERROR" }
+
+    -- Connection status header card
+    local statusHeader = Instance.new("Frame")
+    statusHeader.Size = UDim2.new(1, -4, 0, 30)
+    statusHeader.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+    statusHeader.BackgroundTransparency = 0.25
+    statusHeader.Parent = InfoTab
+    Instance.new("UICorner", statusHeader).CornerRadius = UDim.new(0, 6)
+
+    local serverTitleLbl = Instance.new("TextLabel")
+    serverTitleLbl.Size = UDim2.new(0.6, 0, 1, 0)
+    serverTitleLbl.Position = UDim2.new(0, 10, 0, 0)
+    serverTitleLbl.BackgroundTransparency = 1
+    serverTitleLbl.Text = "<b>LIVE SERVER STATUS</b>"
+    serverTitleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    serverTitleLbl.Font = Enum.Font.GothamBold
+    serverTitleLbl.TextSize = 11
+    serverTitleLbl.RichText = true
+    serverTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    serverTitleLbl.Parent = statusHeader
+
+    local connStatusLbl = Instance.new("TextLabel")
+    connStatusLbl.Size = UDim2.new(0.4, -10, 1, 0)
+    connStatusLbl.Position = UDim2.new(0.6, 0, 0, 0)
+    connStatusLbl.BackgroundTransparency = 1
+    connStatusLbl.Text = "<b>CONNECTED</b>"
+    connStatusLbl.TextColor3 = Color3.fromRGB(70, 225, 150)
+    connStatusLbl.Font = Enum.Font.GothamBold
+    connStatusLbl.TextSize = 10
+    connStatusLbl.RichText = true
+    connStatusLbl.TextXAlignment = Enum.TextXAlignment.Right
+    connStatusLbl.Parent = statusHeader
+
+    -- Server stats 3x2 grid
+    local statsGridFrame = Instance.new("Frame")
+    statsGridFrame.Size = UDim2.new(1, -4, 0, 74)
+    statsGridFrame.BackgroundTransparency = 1
+    statsGridFrame.Parent = InfoTab
+
+    local gridLayout = Instance.new("UIGridLayout")
+    gridLayout.CellSize = UDim2.new(0.32, 0, 0, 34)
+    gridLayout.CellPadding = UDim2.new(0.02, 0, 0, 6)
+    gridLayout.Parent = statsGridFrame
+
+    local infoStatChips = {}
+    local function createStatChip(titleText)
+        local card = Instance.new("Frame")
+        card.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        card.BackgroundTransparency = 0.25
+        card.Parent = statsGridFrame
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(45, 125, 255)
+        stroke.Thickness = 1
+        stroke.Transparency = 0.7
+        stroke.Parent = card
+
+        local cap = Instance.new("TextLabel")
+        cap.Size = UDim2.new(1, -10, 0, 12)
+        cap.Position = UDim2.new(0, 6, 0, 3)
+        cap.BackgroundTransparency = 1
+        cap.Text = titleText
+        cap.TextColor3 = Color3.fromRGB(150, 162, 200)
+        cap.Font = Enum.Font.GothamBold
+        cap.TextSize = 8
+        cap.TextXAlignment = Enum.TextXAlignment.Left
+        cap.Parent = card
+
+        local val = Instance.new("TextLabel")
+        val.Size = UDim2.new(1, -10, 0, 16)
+        val.Position = UDim2.new(0, 6, 0, 15)
+        val.BackgroundTransparency = 1
+        val.Text = "--"
+        val.TextColor3 = Color3.fromRGB(255, 255, 255)
+        val.Font = Enum.Font.GothamBold
+        val.TextSize = 11
+        val.TextXAlignment = Enum.TextXAlignment.Left
+        val.TextTruncate = Enum.TextTruncate.AtEnd
+        val.Parent = card
+
+        infoStatChips[titleText] = { card = card, val = val }
+        return val
+    end
+
+    local pingValLbl    = createStatChip("PING")
+    local fpsValLbl     = createStatChip("FPS")
+    local memValLbl     = createStatChip("MEMORY")
+    local playersValLbl = createStatChip("PLAYERS")
+    local uptimeValLbl  = createStatChip("UPTIME")
+    local jobIdValLbl   = createStatChip("JOB ID")
+
+    -- Tap Job ID chip to copy
+    local jobId = game.JobId
+    local jobShown = (jobId == "") and "STUDIO" or (string.sub(jobId, 1, 8) .. "...")
+    jobIdValLbl.Text = jobShown
+
+    local copyJobBtn = Instance.new("TextButton")
+    copyJobBtn.Size = UDim2.new(1, 0, 1, 0)
+    copyJobBtn.BackgroundTransparency = 1
+    copyJobBtn.Text = ""
+    copyJobBtn.Parent = infoStatChips["JOB ID"].card
+    copyJobBtn.MouseButton1Click:Connect(function()
+        local copier = setclipboard or toclipboard
+        if jobId ~= "" and copier then
+            local ok = pcall(copier, jobId)
+            jobIdValLbl.Text = ok and "COPIED!" or "FAILED"
+            jobIdValLbl.TextColor3 = ok and Color3.fromRGB(70, 225, 150) or Color3.fromRGB(255, 85, 110)
+        else
+            jobIdValLbl.Text = (jobId == "") and "NO ID" or "NO CLIP"
+            jobIdValLbl.TextColor3 = Color3.fromRGB(255, 200, 75)
+        end
+        task.delay(1.2, function()
+            if hubAlive then
+                jobIdValLbl.Text = jobShown
+                jobIdValLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
+        end)
+    end)
+
+    -- Console filter bar
+    local filterBar = Instance.new("Frame")
+    filterBar.Size = UDim2.new(1, -4, 0, 24)
+    filterBar.BackgroundTransparency = 1
+    filterBar.Parent = InfoTab
+
+    local filterLayout = Instance.new("UIListLayout")
+    filterLayout.FillDirection = Enum.FillDirection.Horizontal
+    filterLayout.Padding = UDim.new(0, 3)
+    filterLayout.Parent = filterBar
+
+    local activeFilter = "ALL"
+    local filterBtns = {}
+    local rebuildConsole = function() end
+
+    local function updateFilterColors()
+        for _, fName in ipairs(LOG_FILTERS) do
+            local isOn = (fName == activeFilter)
+            filterBtns[fName].BackgroundColor3 = isOn and Color3.fromRGB(0, 160, 240) or Color3.fromRGB(28, 22, 55)
+            filterBtns[fName].TextColor3 = isOn and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(160, 170, 200)
+        end
+    end
+
+    for _, fName in ipairs(LOG_FILTERS) do
+        local fBtn = Instance.new("TextButton")
+        fBtn.Size = UDim2.new(0.192, 0, 1, 0)
+        fBtn.BackgroundColor3 = Color3.fromRGB(28, 22, 55)
+        fBtn.Text = "<b>" .. fName .. "</b>"
+        fBtn.TextColor3 = Color3.fromRGB(160, 170, 200)
+        fBtn.Font = Enum.Font.GothamBold
+        fBtn.TextSize = 8
+        fBtn.RichText = true
+        fBtn.Parent = filterBar
+        Instance.new("UICorner", fBtn).CornerRadius = UDim.new(0, 5)
+        filterBtns[fName] = fBtn
+
+        fBtn.MouseButton1Click:Connect(function()
+            activeFilter = fName
+            updateFilterColors()
+            rebuildConsole()
         end)
     end
+    updateFilterColors()
+
+    -- Console Search Box
+    local searchBox = Instance.new("TextBox")
+    searchBox.Size = UDim2.new(1, -4, 0, 26)
+    searchBox.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+    searchBox.PlaceholderText = "Search console logs..."
+    searchBox.PlaceholderColor3 = Color3.fromRGB(130, 140, 175)
+    searchBox.Text = ""
+    searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    searchBox.Font = Enum.Font.Gotham
+    searchBox.TextSize = 11
+    searchBox.TextXAlignment = Enum.TextXAlignment.Left
+    searchBox.ClearTextOnFocus = false
+    searchBox.Parent = InfoTab
+    Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIPadding", searchBox).PaddingLeft = UDim.new(0, 8)
+
+    -- Console Output Scroll Frame
+    local consoleScroll = Instance.new("ScrollingFrame")
+    consoleScroll.Size = UDim2.new(1, -4, 0, 145)
+    consoleScroll.BackgroundColor3 = Color3.fromRGB(8, 10, 22)
+    consoleScroll.BorderSizePixel = 0
+    consoleScroll.ScrollBarThickness = 3
+    consoleScroll.ScrollBarImageColor3 = Color3.fromRGB(150, 70, 255)
+    consoleScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    consoleScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    consoleScroll.Parent = InfoTab
+    Instance.new("UICorner", consoleScroll).CornerRadius = UDim.new(0, 6)
+
+    local consoleList = Instance.new("UIListLayout")
+    consoleList.Padding = UDim.new(0, 2)
+    consoleList.SortOrder = Enum.SortOrder.LayoutOrder
+    consoleList.Parent = consoleScroll
+
+    local consolePad = Instance.new("UIPadding")
+    consolePad.PaddingTop = UDim.new(0, 4)
+    consolePad.PaddingBottom = UDim.new(0, 4)
+    consolePad.PaddingLeft = UDim.new(0, 5)
+    consolePad.PaddingRight = UDim.new(0, 6)
+    consolePad.Parent = consoleScroll
+
+    -- Console bottom controls (Clear, Auto-Scroll, Counter)
+    local consoleControls = Instance.new("Frame")
+    consoleControls.Size = UDim2.new(1, -4, 0, 26)
+    consoleControls.BackgroundTransparency = 1
+    consoleControls.Parent = InfoTab
+
+    local clearConsoleBtn = Instance.new("TextButton")
+    clearConsoleBtn.Size = UDim2.new(0.36, 0, 1, 0)
+    clearConsoleBtn.Position = UDim2.new(0, 0, 0, 0)
+    clearConsoleBtn.BackgroundColor3 = Color3.fromRGB(28, 22, 55)
+    clearConsoleBtn.Text = "<b>CLEAR</b>"
+    clearConsoleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    clearConsoleBtn.Font = Enum.Font.GothamBold
+    clearConsoleBtn.TextSize = 9
+    clearConsoleBtn.RichText = true
+    clearConsoleBtn.Parent = consoleControls
+    Instance.new("UICorner", clearConsoleBtn).CornerRadius = UDim.new(0, 5)
+
+    local autoScrollEnabled = true
+    local autoScrollBtn = Instance.new("TextButton")
+    autoScrollBtn.Size = UDim2.new(0.42, 0, 1, 0)
+    autoScrollBtn.Position = UDim2.new(0.38, 0, 0, 0)
+    autoScrollBtn.BackgroundColor3 = Color3.fromRGB(150, 70, 255)
+    autoScrollBtn.Text = "<b>AUTO-SCROLL: ON</b>"
+    autoScrollBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    autoScrollBtn.Font = Enum.Font.GothamBold
+    autoScrollBtn.TextSize = 9
+    autoScrollBtn.RichText = true
+    autoScrollBtn.Parent = consoleControls
+    Instance.new("UICorner", autoScrollBtn).CornerRadius = UDim.new(0, 5)
+
+    local logCountLbl = Instance.new("TextLabel")
+    logCountLbl.Size = UDim2.new(0.18, 0, 1, 0)
+    logCountLbl.Position = UDim2.new(0.82, 0, 0, 0)
+    logCountLbl.BackgroundTransparency = 1
+    logCountLbl.Text = "0/" .. MAX_LOGS
+    logCountLbl.TextColor3 = Color3.fromRGB(150, 162, 200)
+    logCountLbl.Font = Enum.Font.GothamBold
+    logCountLbl.TextSize = 9
+    logCountLbl.TextXAlignment = Enum.TextXAlignment.Right
+    logCountLbl.Parent = consoleControls
+
+    -- Console Log Engine
+    local logEntries = {}
+    local pendingLogs = {}
+    local pendingHead = 1
+    local logCounter = 0
+    local searchQuery = ""
+    local scrollQueued = 0
+
+    local function escapeRichText(str)
+        str = string.gsub(str, "&", "&amp;")
+        str = string.gsub(str, "<", "&lt;")
+        str = string.gsub(str, ">", "&gt;")
+        return str
+    end
+
+    local function createLogRow(entry)
+        local info = LOG_KIND[entry.kind]
+        local row = Instance.new("TextLabel")
+        row.LayoutOrder = entry.id
+        row.Size = UDim2.new(1, 0, 0, 0)
+        row.AutomaticSize = Enum.AutomaticSize.Y
+        row.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+        row.BackgroundTransparency = (entry.id % 2 == 0) and 0.85 or 1
+        row.BorderSizePixel = 0
+        row.RichText = true
+        row.TextWrapped = true
+        row.Font = Enum.Font.Code
+        row.TextSize = 10
+        row.TextColor3 = info.color
+        row.TextXAlignment = Enum.TextXAlignment.Left
+        row.TextYAlignment = Enum.TextYAlignment.Top
+        row.Text = string.format(
+            '<font color="#7F8BB8">[%s]</font> <font color="%s"><b>[%s]</b></font> %s',
+            entry.time, info.hex, info.label, escapeRichText(entry.text)
+        )
+        row.Parent = consoleScroll
+        entry.row = row
+    end
+
+    local function pushConsoleLog(msg, kind, ts)
+        if not hubAlive then return end
+        kind = LOG_KIND[kind] and kind or "OUTPUT"
+        logCounter = logCounter + 1
+        local cleanText = string.sub(tostring(msg), 1, 500)
+        local entry = {
+            id = logCounter,
+            kind = kind,
+            text = cleanText,
+            lower = string.lower(cleanText),
+            time = os.date("%H:%M:%S", ts),
+        }
+        table.insert(logEntries, entry)
+
+        while #logEntries > MAX_LOGS do
+            local old = table.remove(logEntries, 1)
+            old.removed = true
+            if old.row then
+                old.row:Destroy()
+                old.row = nil
+            end
+        end
+
+        local matchesFilter = (activeFilter == "ALL" or activeFilter == kind)
+        local matchesSearch = (searchQuery == "" or string.find(entry.lower, searchQuery, 1, true) ~= nil)
+        if matchesFilter and matchesSearch then
+            table.insert(pendingLogs, entry)
+        end
+    end
+
+    rebuildConsole = function()
+        for _, entry in ipairs(logEntries) do
+            if entry.row then
+                entry.row:Destroy()
+                entry.row = nil
+            end
+        end
+        pendingLogs = {}
+        pendingHead = 1
+        for _, entry in ipairs(logEntries) do
+            local matchesFilter = (activeFilter == "ALL" or activeFilter == entry.kind)
+            local matchesSearch = (searchQuery == "" or string.find(entry.lower, searchQuery, 1, true) ~= nil)
+            if matchesFilter and matchesSearch then
+                table.insert(pendingLogs, entry)
+            end
+        end
+        if autoScrollEnabled then scrollQueued = 2 end
+    end
+
+    local searchToken = 0
+    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        searchQuery = string.lower(searchBox.Text)
+        searchToken = searchToken + 1
+        local currentToken = searchToken
+        task.delay(0.15, function()
+            if hubAlive and currentToken == searchToken then
+                rebuildConsole()
+            end
+        end)
+    end)
+
+    clearConsoleBtn.MouseButton1Click:Connect(function()
+        for _, entry in ipairs(logEntries) do
+            entry.removed = true
+            if entry.row then entry.row:Destroy() end
+        end
+        logEntries = {}
+        pendingLogs = {}
+        pendingHead = 1
+        pushConsoleLog("Console cleared.", "INFO")
+    end)
+
+    autoScrollBtn.MouseButton1Click:Connect(function()
+        autoScrollEnabled = not autoScrollEnabled
+        autoScrollBtn.Text = autoScrollEnabled and "<b>AUTO-SCROLL: ON</b>" or "<b>AUTO-SCROLL: OFF</b>"
+        autoScrollBtn.BackgroundColor3 = autoScrollEnabled and Color3.fromRGB(150, 70, 255) or Color3.fromRGB(28, 22, 55)
+        if autoScrollEnabled then scrollQueued = 2 end
+    end)
+
+    local function mapMsgType(msgType)
+        if msgType == Enum.MessageType.MessageWarning then return "WARN"
+        elseif msgType == Enum.MessageType.MessageError then return "ERROR"
+        elseif msgType == Enum.MessageType.MessageInfo then return "INFO"
+        end
+        return "OUTPUT"
+    end
+
+    pcall(function()
+        local history = LogService:GetLogHistory()
+        local startIdx = math.max(1, #history - 80 + 1)
+        for i = startIdx, #history do
+            local item = history[i]
+            pushConsoleLog(item.message, mapMsgType(item.messageType), item.timestamp)
+        end
+    end)
+
+    pcall(function()
+        trackConn(LogService.MessageOut:Connect(function(msg, msgType)
+            pushConsoleLog(msg, mapMsgType(msgType))
+        end))
+    end)
+
+    -- Live Server Stats Updater
+    local frameCounter = 0
+    local lastStatsClock = os.clock()
+    local isDisconnected = false
+
+    pcall(function()
+        local netClient = game:GetService("NetworkClient")
+        trackConn(netClient.ChildRemoved:Connect(function()
+            isDisconnected = true
+            pushConsoleLog("Disconnected from server.", "ERROR")
+        end))
+    end)
+
+    local function fetchPing()
+        local ok, val = pcall(function() return Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
+        if ok and type(val) == "number" then return math.floor(val + 0.5) end
+        local okP, ms = pcall(function() return LocalPlayer:GetNetworkPing() * 1000 end)
+        if okP and type(ms) == "number" then return math.floor(ms + 0.5) end
+        return nil
+    end
+
+    local function fmtTime(sec)
+        sec = math.floor(sec)
+        return string.format("%d:%02d:%02d", math.floor(sec / 3600), math.floor(sec / 60) % 60, sec % 60)
+    end
+
+    task.spawn(function()
+        while hubAlive and ScreenGui.Parent do
+            local now = os.clock()
+            local dt = now - lastStatsClock
+            if dt > 0 then
+                local fps = frameCounter / dt
+                frameCounter = 0
+                lastStatsClock = now
+
+                local ping = fetchPing()
+                local okMem, mem = pcall(function() return Stats:GetTotalMemoryUsageMb() end)
+                local okPlr, pList = pcall(function() return #Players:GetPlayers() end)
+
+                if ping then
+                    pingValLbl.Text = ping .. " ms"
+                    pingValLbl.TextColor3 = (ping < 100 and Color3.fromRGB(70, 225, 150)) or (ping < 200 and Color3.fromRGB(255, 200, 75)) or Color3.fromRGB(255, 85, 110)
+                else
+                    pingValLbl.Text = "N/A"
+                    pingValLbl.TextColor3 = Color3.fromRGB(150, 162, 200)
+                end
+
+                local rFps = math.floor(fps + 0.5)
+                fpsValLbl.Text = tostring(rFps)
+                fpsValLbl.TextColor3 = (rFps >= 45 and Color3.fromRGB(70, 225, 150)) or (rFps >= 25 and Color3.fromRGB(255, 200, 75)) or Color3.fromRGB(255, 85, 110)
+
+                memValLbl.Text = (okMem and type(mem) == "number") and string.format("%.0f MB", mem) or "N/A"
+                playersValLbl.Text = (okPlr and pList or "?") .. "/" .. Players.MaxPlayers
+                uptimeValLbl.Text = fmtTime(workspace.DistributedGameTime)
+
+                if isDisconnected or not LocalPlayer:IsDescendantOf(game) then
+                    connStatusLbl.Text = "<b>DISCONNECTED</b>"
+                    connStatusLbl.TextColor3 = Color3.fromRGB(255, 85, 110)
+                elseif (ping and ping >= 400) or rFps < 8 then
+                    connStatusLbl.Text = "<b>UNSTABLE</b>"
+                    connStatusLbl.TextColor3 = Color3.fromRGB(255, 85, 110)
+                elseif ping and ping >= 200 then
+                    connStatusLbl.Text = "<b>SLOW LINK</b>"
+                    connStatusLbl.TextColor3 = Color3.fromRGB(255, 200, 75)
+                else
+                    connStatusLbl.Text = "<b>CONNECTED</b>"
+                    connStatusLbl.TextColor3 = Color3.fromRGB(70, 225, 150)
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    -- Combined RenderStepped loop (AutoAim + Console Row Batching + FPS Counter)
+    trackConn(RunService.RenderStepped:Connect(function()
+        frameCounter = frameCounter + 1
+
+        pcall(function()
+            if Config.AutoAim then
+                local target = GetNearestEnemyTarget(Config.AutoAimRange)
+                local cam = Workspace.CurrentCamera
+                if target and cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, target.Position) end
+            end
+        end)
+
+        -- Flush console rows in batches
+        local avail = #pendingLogs - pendingHead + 1
+        if avail > 0 then
+            local created = 0
+            while pendingHead <= #pendingLogs and created < 30 do
+                local entry = pendingLogs[pendingHead]
+                pendingLogs[pendingHead] = false
+                pendingHead = pendingHead + 1
+                if entry and not entry.removed and not entry.row then
+                    createLogRow(entry)
+                    created = created + 1
+                end
+            end
+            if pendingHead > #pendingLogs then
+                pendingLogs = {}
+                pendingHead = 1
+            end
+            if autoScrollEnabled then scrollQueued = 2 end
+        end
+
+        if scrollQueued > 0 then
+            scrollQueued = scrollQueued - 1
+            if scrollQueued == 0 then
+                consoleScroll.CanvasPosition = Vector2.new(0, 1000000)
+            end
+        end
+
+        local countStr = #logEntries .. "/" .. MAX_LOGS
+        if logCountLbl.Text ~= countStr then logCountLbl.Text = countStr end
+    end))
+
+    pushConsoleLog("Brineland Server Info & Console initialized.", "INFO")
+    rebuildConsole()
 end
 
 -- ============================================================
