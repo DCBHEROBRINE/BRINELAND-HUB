@@ -1291,7 +1291,7 @@ local function RunStealAnEgg()
 end
 
 -- ============================================================
--- SCRIPT 3: UNIVERSAL HUB (WITH INTEGRATED SERVER INFO & CONSOLE)
+-- SCRIPT 3: UNIVERSAL HUB (WITH INTEGRATED INFO & 3D BODY PREVIEW)
 -- ============================================================
 local function RunUniversalScript()
     local TweenService     = game:GetService("TweenService")
@@ -1399,7 +1399,7 @@ local function RunUniversalScript()
         return closestPart
     end
 
-    -- Universal Bypassed Mobile/PC CFrame Fly Engine
+    -- Universal Bypassed Fly Engine (No floating buttons)
     local function GetFlightVector()
         local vector = Vector3.new(0, 0, 0)
         if UserInputService:IsKeyDown(Enum.KeyCode.W) or mobileInputs.Forward then vector = vector + Vector3.new(0, 0, -1) end
@@ -1455,69 +1455,6 @@ local function RunUniversalScript()
             humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
         end
     end
-
-    -- Floating Mobile Fly Buttons GUI
-    local FlyGui = Instance.new("ScreenGui")
-    FlyGui.Name = "FlyMobileGUI"
-    FlyGui.ResetOnSpawn = false
-    pcall(function()
-        FlyGui.Parent = (gethui and gethui()) or CoreGui
-    end)
-    if not FlyGui.Parent then
-        FlyGui.Parent = PlayerGui
-    end
-
-    local FlyToggleBtn = Instance.new("TextButton")
-    FlyToggleBtn.Size = UDim2.fromOffset(100, 40)
-    FlyToggleBtn.Position = UDim2.new(0.03, 0, 0.35, 0)
-    FlyToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 16, 35)
-    FlyToggleBtn.TextColor3 = Color3.fromRGB(225, 35, 65)
-    FlyToggleBtn.TextSize = 12
-    FlyToggleBtn.Font = Enum.Font.GothamBold
-    FlyToggleBtn.Text = "<b>FLY: OFF</b>"
-    FlyToggleBtn.RichText = true
-    FlyToggleBtn.Active = true
-    FlyToggleBtn.Draggable = true
-    FlyToggleBtn.Parent = FlyGui
-    Instance.new("UICorner", FlyToggleBtn).CornerRadius = UDim.new(0, 8)
-
-    FlyToggleBtn.MouseButton1Click:Connect(function()
-        if Config.FlyEnabled then
-            DisableFly()
-            FlyToggleBtn.Text = "<b>FLY: OFF</b>"
-            FlyToggleBtn.TextColor3 = Color3.fromRGB(225, 35, 65)
-        else
-            EnableFly()
-            FlyToggleBtn.Text = "<b>FLY: ON</b>"
-            FlyToggleBtn.TextColor3 = Color3.fromRGB(50, 255, 50)
-        end
-    end)
-
-    local UpBtn = Instance.new("TextButton")
-    UpBtn.Size = UDim2.fromOffset(42, 42)
-    UpBtn.Position = UDim2.new(0.9, 0, 0.55, 0)
-    UpBtn.BackgroundColor3 = Color3.fromRGB(20, 16, 35)
-    UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    UpBtn.TextSize = 16
-    UpBtn.Font = Enum.Font.GothamBold
-    UpBtn.Text = "▲"
-    UpBtn.Parent = FlyGui
-    Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(0, 8)
-    UpBtn.MouseButton1Down:Connect(function() mobileInputs.Up = true end)
-    UpBtn.MouseButton1Up:Connect(function() mobileInputs.Up = false end)
-
-    local DownBtn = Instance.new("TextButton")
-    DownBtn.Size = UDim2.fromOffset(42, 42)
-    DownBtn.Position = UDim2.new(0.9, 0, 0.67, 0)
-    DownBtn.BackgroundColor3 = Color3.fromRGB(20, 16, 35)
-    DownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    DownBtn.TextSize = 16
-    DownBtn.Font = Enum.Font.GothamBold
-    DownBtn.Text = "▼"
-    DownBtn.Parent = FlyGui
-    Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(0, 8)
-    DownBtn.MouseButton1Down:Connect(function() mobileInputs.Down = true end)
-    DownBtn.MouseButton1Up:Connect(function() mobileInputs.Down = false end)
 
     trackConn(RunService.Stepped:Connect(function()
         pcall(function()
@@ -1731,7 +1668,6 @@ local function RunUniversalScript()
         hubAlive = false
         for _, c in ipairs(hubConns) do pcall(function() c:Disconnect() end) end
         DisableFly()
-        FlyGui:Destroy()
         ScreenGui:Destroy()
     end)
 
@@ -1749,7 +1685,6 @@ local function RunUniversalScript()
     local TabFrames = {}
     local function CreateTab(tabName)
         local tabBtn = Instance.new("TextButton")
-        -- 6 tabs fit cleanly across the 348px TabBar width
         tabBtn.Size = UDim2.new(0.162, 0, 1, 0)
         tabBtn.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
         tabBtn.BackgroundTransparency = 0.3
@@ -1794,16 +1729,17 @@ local function RunUniversalScript()
         return container
     end
 
+    -- INFO TAB CREATED FIRST (LEFT SIDE)
+    local InfoTab      = CreateTab("Info")
     local TeleportsTab = CreateTab("Teleports")
     local PlayersTab   = CreateTab("Player")
     local PlayerTab    = CreateTab("Cheats")
     local VisualsTab   = CreateTab("Visuals")
     local KeyTab       = CreateTab("Key")
-    local InfoTab      = CreateTab("Info")
 
-    TabFrames["Teleports"].Container.Visible = true
-    TabFrames["Teleports"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
-    TabFrames["Teleports"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TabFrames["Info"].Container.Visible = true
+    TabFrames["Info"].Button.BackgroundColor3 = Color3.fromRGB(0, 160, 240)
+    TabFrames["Info"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
 
     local isMinimized = false
     MinimizeBtn.MouseButton1Click:Connect(function()
@@ -2207,15 +2143,7 @@ local function RunUniversalScript()
     end)
     CreateSlider(PlayerTab, "Player Speed", 16, 300, Config.WalkSpeed, true, function(val) Config.WalkSpeed = val end)
     CreateToggle(PlayerTab, "Enable Fly", function(state)
-        if state then
-            EnableFly()
-            FlyToggleBtn.Text = "<b>FLY: ON</b>"
-            FlyToggleBtn.TextColor3 = Color3.fromRGB(50, 255, 50)
-        else
-            DisableFly()
-            FlyToggleBtn.Text = "<b>FLY: OFF</b>"
-            FlyToggleBtn.TextColor3 = Color3.fromRGB(225, 35, 65)
-        end
+        if state then EnableFly() else DisableFly() end
     end)
     CreateSlider(PlayerTab, "Fly Speed", 10, 300, Config.FlySpeed, true, function(val) Config.FlySpeed = val end)
     CreateToggle(PlayerTab, "Noclip", function(state) Config.Noclip = state end)
@@ -2227,16 +2155,7 @@ local function RunUniversalScript()
 
     -- KEYBINDS TAB
     local bindableActions = {
-        {Name = "Fly Toggle", Action = function() 
-            if Config.FlyEnabled then DisableFly() else EnableFly() end 
-            if Config.FlyEnabled then
-                FlyToggleBtn.Text = "<b>FLY: ON</b>"
-                FlyToggleBtn.TextColor3 = Color3.fromRGB(50, 255, 50)
-            else
-                FlyToggleBtn.Text = "<b>FLY: OFF</b>"
-                FlyToggleBtn.TextColor3 = Color3.fromRGB(225, 35, 65)
-            end
-        end},
+        {Name = "Fly Toggle", Action = function() if Config.FlyEnabled then DisableFly() else EnableFly() end end},
         {Name = "Noclip Toggle", Action = function() Config.Noclip = not Config.Noclip end},
         {Name = "Player ESP Toggle", Action = function() ToggleESPState(not Config.PlayerESP) end},
         {Name = "Clean Vision Toggle", Action = function() ToggleCleanVision(not Config.CleanVision) end},
@@ -2293,7 +2212,7 @@ local function RunUniversalScript()
     end
 
     -- ============================================================
-    -- INFO TAB: SERVER TELEMETRY & LIVE CONSOLE (NO PLAYER PROFILE)
+    -- INFO TAB: SERVER TELEMETRY, 3D PLAYER PREVIEW & LIVE CONSOLE
     -- ============================================================
     local MAX_LOGS = 200
     local LOG_KIND = {
@@ -2304,66 +2223,75 @@ local function RunUniversalScript()
     }
     local LOG_FILTERS = { "ALL", "OUTPUT", "INFO", "WARN", "ERROR" }
 
-    -- Connection status header card
+    -- Top row split: Left = Live Connection Badge, Right = 3D Player Body Preview Card
+    local topRowContainer = Instance.new("Frame")
+    topRowContainer.Size = UDim2.new(1, -4, 0, 115)
+    topRowContainer.BackgroundTransparency = 1
+    topRowContainer.Parent = InfoTab
+
+    -- Left Column (Connection & Telemetry Chips)
+    local leftTelemetryCol = Instance.new("Frame")
+    leftTelemetryCol.Size = UDim2.new(0.58, -4, 1, 0)
+    leftTelemetryCol.BackgroundTransparency = 1
+    leftTelemetryCol.Parent = topRowContainer
+
+    local telemetryLayout = Instance.new("UIListLayout")
+    telemetryLayout.Padding = UDim.new(0, 5)
+    telemetryLayout.Parent = leftTelemetryCol
+
     local statusHeader = Instance.new("Frame")
-    statusHeader.Size = UDim2.new(1, -4, 0, 30)
+    statusHeader.Size = UDim2.new(1, 0, 0, 32)
     statusHeader.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
     statusHeader.BackgroundTransparency = 0.25
-    statusHeader.Parent = InfoTab
+    statusHeader.Parent = leftTelemetryCol
     Instance.new("UICorner", statusHeader).CornerRadius = UDim.new(0, 6)
 
     local serverTitleLbl = Instance.new("TextLabel")
-    serverTitleLbl.Size = UDim2.new(0.6, 0, 1, 0)
-    serverTitleLbl.Position = UDim2.new(0, 10, 0, 0)
+    serverTitleLbl.Size = UDim2.new(0.55, 0, 1, 0)
+    serverTitleLbl.Position = UDim2.new(0, 8, 0, 0)
     serverTitleLbl.BackgroundTransparency = 1
-    serverTitleLbl.Text = "<b>LIVE SERVER STATUS</b>"
+    serverTitleLbl.Text = "<b>SERVER STATUS</b>"
     serverTitleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
     serverTitleLbl.Font = Enum.Font.GothamBold
-    serverTitleLbl.TextSize = 11
+    serverTitleLbl.TextSize = 10
     serverTitleLbl.RichText = true
     serverTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
     serverTitleLbl.Parent = statusHeader
 
     local connStatusLbl = Instance.new("TextLabel")
-    connStatusLbl.Size = UDim2.new(0.4, -10, 1, 0)
-    connStatusLbl.Position = UDim2.new(0.6, 0, 0, 0)
+    connStatusLbl.Size = UDim2.new(0.45, -8, 1, 0)
+    connStatusLbl.Position = UDim2.new(0.55, 0, 0, 0)
     connStatusLbl.BackgroundTransparency = 1
     connStatusLbl.Text = "<b>CONNECTED</b>"
     connStatusLbl.TextColor3 = Color3.fromRGB(70, 225, 150)
     connStatusLbl.Font = Enum.Font.GothamBold
-    connStatusLbl.TextSize = 10
+    connStatusLbl.TextSize = 9
     connStatusLbl.RichText = true
     connStatusLbl.TextXAlignment = Enum.TextXAlignment.Right
     connStatusLbl.Parent = statusHeader
 
-    -- Server stats 3x2 grid
-    local statsGridFrame = Instance.new("Frame")
-    statsGridFrame.Size = UDim2.new(1, -4, 0, 74)
-    statsGridFrame.BackgroundTransparency = 1
-    statsGridFrame.Parent = InfoTab
+    -- 2x2 Mini Stat Chips under connection header
+    local miniGrid = Instance.new("Frame")
+    miniGrid.Size = UDim2.new(1, 0, 0, 76)
+    miniGrid.BackgroundTransparency = 1
+    miniGrid.Parent = leftTelemetryCol
 
-    local gridLayout = Instance.new("UIGridLayout")
-    gridLayout.CellSize = UDim2.new(0.32, 0, 0, 34)
-    gridLayout.CellPadding = UDim2.new(0.02, 0, 0, 6)
-    gridLayout.Parent = statsGridFrame
+    local miniLayout = Instance.new("UIGridLayout")
+    miniLayout.CellSize = UDim2.new(0.48, 0, 0, 35)
+    miniLayout.CellPadding = UDim2.new(0.04, 0, 0, 6)
+    miniLayout.Parent = miniGrid
 
     local infoStatChips = {}
-    local function createStatChip(titleText)
+    local function createMiniStatChip(titleText)
         local card = Instance.new("Frame")
         card.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
         card.BackgroundTransparency = 0.25
-        card.Parent = statsGridFrame
+        card.Parent = miniGrid
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
 
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(45, 125, 255)
-        stroke.Thickness = 1
-        stroke.Transparency = 0.7
-        stroke.Parent = card
-
         local cap = Instance.new("TextLabel")
-        cap.Size = UDim2.new(1, -10, 0, 12)
-        cap.Position = UDim2.new(0, 6, 0, 3)
+        cap.Size = UDim2.new(1, -8, 0, 12)
+        cap.Position = UDim2.new(0, 6, 0, 2)
         cap.BackgroundTransparency = 1
         cap.Text = titleText
         cap.TextColor3 = Color3.fromRGB(150, 162, 200)
@@ -2373,13 +2301,13 @@ local function RunUniversalScript()
         cap.Parent = card
 
         local val = Instance.new("TextLabel")
-        val.Size = UDim2.new(1, -10, 0, 16)
+        val.Size = UDim2.new(1, -8, 0, 16)
         val.Position = UDim2.new(0, 6, 0, 15)
         val.BackgroundTransparency = 1
         val.Text = "--"
         val.TextColor3 = Color3.fromRGB(255, 255, 255)
         val.Font = Enum.Font.GothamBold
-        val.TextSize = 11
+        val.TextSize = 10
         val.TextXAlignment = Enum.TextXAlignment.Left
         val.TextTruncate = Enum.TextTruncate.AtEnd
         val.Parent = card
@@ -2388,37 +2316,128 @@ local function RunUniversalScript()
         return val
     end
 
-    local pingValLbl    = createStatChip("PING")
-    local fpsValLbl     = createStatChip("FPS")
-    local memValLbl     = createStatChip("MEMORY")
-    local playersValLbl = createStatChip("PLAYERS")
-    local uptimeValLbl  = createStatChip("UPTIME")
-    local jobIdValLbl   = createStatChip("JOB ID")
+    local pingValLbl    = createMiniStatChip("PING")
+    local fpsValLbl     = createMiniStatChip("FPS")
+    local memValLbl     = createMiniStatChip("MEMORY")
+    local uptimeValLbl  = createMiniStatChip("UPTIME")
 
-    -- Tap Job ID chip to copy
+    -- Right Column (3D Player Body Preview Card)
+    local avatarCard = Instance.new("Frame")
+    avatarCard.Size = UDim2.new(0.42, -2, 1, 0)
+    avatarCard.Position = UDim2.new(0.58, 2, 0, 0)
+    avatarCard.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+    avatarCard.BackgroundTransparency = 0.25
+    avatarCard.Parent = topRowContainer
+    Instance.new("UICorner", avatarCard).CornerRadius = UDim.new(0, 6)
+
+    local avatarStroke = Instance.new("UIStroke")
+    avatarStroke.Color = Color3.fromRGB(0, 229, 255)
+    avatarStroke.Thickness = 1
+    avatarStroke.Transparency = 0.6
+    avatarStroke.Parent = avatarCard
+
+    local viewport = Instance.new("ViewportFrame")
+    viewport.Size = UDim2.new(1, -8, 1, -22)
+    viewport.Position = UDim2.new(0, 4, 0, 4)
+    viewport.BackgroundTransparency = 1
+    viewport.Parent = avatarCard
+
+    local avatarNameLbl = Instance.new("TextLabel")
+    avatarNameLbl.Size = UDim2.new(1, 0, 0, 16)
+    avatarNameLbl.Position = UDim2.new(0, 0, 1, -18)
+    avatarNameLbl.BackgroundTransparency = 1
+    avatarNameLbl.Text = "<b>" .. string.sub(LocalPlayer.DisplayName, 1, 12) .. "</b>"
+    avatarNameLbl.TextColor3 = Color3.fromRGB(0, 229, 255)
+    avatarNameLbl.Font = Enum.Font.GothamBold
+    avatarNameLbl.TextSize = 9
+    avatarNameLbl.RichText = true
+    avatarNameLbl.TextXAlignment = Enum.TextXAlignment.Center
+    avatarNameLbl.Parent = avatarCard
+
+    -- Setup 3D Character Model inside ViewportFrame
+    task.spawn(function()
+        pcall(function()
+            local model = LocalPlayer.Character
+            if model then
+                model = model:Clone()
+                for _, desc in ipairs(model:GetDescendants()) do
+                    if desc:IsA("Script") or desc:IsA("LocalScript") or desc:IsA("Humanoid") then
+                        pcall(function() desc:Destroy() end)
+                    end
+                end
+                local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+                if hrp then
+                    model:PivotTo(CFrame.new(0, 0, 0))
+                    viewport.CurrentCamera = Instance.new("Camera")
+                    viewport.CurrentCamera.CFrame = CFrame.new(Vector3.new(0, 2.5, 4.2), hrp.Position + Vector3.new(0, 0.8, 0))
+                    viewport.CurrentCamera.Parent = viewport
+                    model.Parent = viewport
+
+                    -- Live rotation animation for 3D body preview
+                    local rotAngle = 0
+                    trackConn(RunService.RenderStepped:Connect(function(dt)
+                        if hubAlive and model.Parent and hrp then
+                            rotAngle = rotAngle + (dt * 45)
+                            model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(rotAngle), 0))
+                        end
+                    end))
+                end
+            end
+        end)
+    end)
+
+    -- Extra bottom stats (Players & Job ID strip)
+    local bottomStatsRow = Instance.new("Frame")
+    bottomStatsRow.Size = UDim2.new(1, -4, 0, 32)
+    bottomStatsRow.BackgroundColor3 = Color3.fromRGB(22, 18, 45)
+    bottomStatsRow.BackgroundTransparency = 0.25
+    bottomStatsRow.Parent = InfoTab
+    Instance.new("UICorner", bottomStatsRow).CornerRadius = UDim.new(0, 6)
+
+    local playersValLbl = Instance.new("TextLabel")
+    playersValLbl.Size = UDim2.new(0.45, 0, 1, 0)
+    playersValLbl.Position = UDim2.new(0, 8, 0, 0)
+    playersValLbl.BackgroundTransparency = 1
+    playersValLbl.Text = "<b>PLAYERS:</b> --"
+    playersValLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    playersValLbl.Font = Enum.Font.GothamBold
+    playersValLbl.TextSize = 9
+    playersValLbl.RichText = true
+    playersValLbl.TextXAlignment = Enum.TextXAlignment.Left
+    playersValLbl.Parent = bottomStatsRow
+
+    local jobIdValLbl = Instance.new("TextLabel")
+    jobIdValLbl.Size = UDim2.new(0.55, -8, 1, 0)
+    jobIdValLbl.Position = UDim2.new(0.45, 0, 0, 0)
+    jobIdValLbl.BackgroundTransparency = 1
     local jobId = game.JobId
-    local jobShown = (jobId == "") and "STUDIO" or (string.sub(jobId, 1, 8) .. "...")
-    jobIdValLbl.Text = jobShown
+    local jobShown = (jobId == "") and "STUDIO" or (string.sub(jobId, 1, 10) .. "...")
+    jobIdValLbl.Text = "<b>JOB ID:</b> " .. jobShown
+    jobIdValLbl.TextColor3 = Color3.fromRGB(0, 229, 255)
+    jobIdValLbl.Font = Enum.Font.GothamBold
+    jobIdValLbl.TextSize = 9
+    jobIdValLbl.RichText = true
+    jobIdValLbl.TextXAlignment = Enum.TextXAlignment.Right
+    jobIdValLbl.Parent = bottomStatsRow
 
     local copyJobBtn = Instance.new("TextButton")
     copyJobBtn.Size = UDim2.new(1, 0, 1, 0)
     copyJobBtn.BackgroundTransparency = 1
     copyJobBtn.Text = ""
-    copyJobBtn.Parent = infoStatChips["JOB ID"].card
+    copyJobBtn.Parent = bottomStatsRow
     copyJobBtn.MouseButton1Click:Connect(function()
         local copier = setclipboard or toclipboard
         if jobId ~= "" and copier then
             local ok = pcall(copier, jobId)
-            jobIdValLbl.Text = ok and "COPIED!" or "FAILED"
+            jobIdValLbl.Text = ok and "<b>COPIED!</b>" or "<b>FAILED</b>"
             jobIdValLbl.TextColor3 = ok and Color3.fromRGB(70, 225, 150) or Color3.fromRGB(255, 85, 110)
         else
-            jobIdValLbl.Text = (jobId == "") and "NO ID" or "NO CLIP"
-            jobIdValLbl.TextColor3 = Color3.fromRGB(255, 200, 75)
+            jobIdValLbl.Text = (jobId == "") and "<b>NO ID</b>" or "<b>NO CLIP</b>"
         end
         task.delay(1.2, function()
             if hubAlive then
-                jobIdValLbl.Text = jobShown
-                jobIdValLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+                jobIdValLbl.Text = "<b>JOB ID:</b> " .. jobShown
+                jobIdValLbl.TextColor3 = Color3.fromRGB(0, 229, 255)
             end
         end)
     end)
@@ -2485,7 +2504,7 @@ local function RunUniversalScript()
 
     -- Console Output Scroll Frame
     local consoleScroll = Instance.new("ScrollingFrame")
-    consoleScroll.Size = UDim2.new(1, -4, 0, 145)
+    consoleScroll.Size = UDim2.new(1, -4, 0, 125)
     consoleScroll.BackgroundColor3 = Color3.fromRGB(8, 10, 22)
     consoleScroll.BorderSizePixel = 0
     consoleScroll.ScrollBarThickness = 3
@@ -2742,7 +2761,7 @@ local function RunUniversalScript()
                 fpsValLbl.TextColor3 = (rFps >= 45 and Color3.fromRGB(70, 225, 150)) or (rFps >= 25 and Color3.fromRGB(255, 200, 75)) or Color3.fromRGB(255, 85, 110)
 
                 memValLbl.Text = (okMem and type(mem) == "number") and string.format("%.0f MB", mem) or "N/A"
-                playersValLbl.Text = (okPlr and pList or "?") .. "/" .. Players.MaxPlayers
+                playersValLbl.Text = string.format("<b>PLAYERS:</b> %d/%d", okPlr and pList or "?", Players.MaxPlayers)
                 uptimeValLbl.Text = fmtTime(workspace.DistributedGameTime)
 
                 if isDisconnected or not LocalPlayer:IsDescendantOf(game) then
