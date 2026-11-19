@@ -315,18 +315,6 @@ end
 VerifyAndLoadHub()
 
 -- ============================================================
--- MAIN GAME LOGIC & ROUTER
--- ============================================================
-local MarketplaceService = game:GetService("MarketplaceService")
-local PlaceId = game.PlaceId
-local GameId = game.GameId
-
-local success, info = pcall(function()
-    return MarketplaceService:GetProductInfo(PlaceId)
-end)
-local gameName = (success and info and info.Name) or ""
-
--- ============================================================
 -- SCRIPT 1: TAXI BOSS HUB
 -- ============================================================
 local function RunTaxiBoss()
@@ -784,12 +772,9 @@ local function RunStealAnEgg()
 
         local areaSlots = Workspace:FindFirstChild("AreaEggSlotsClient")
         if areaSlots then
-            local children = pcall(function() return areaSlots:GetChildren() end)
-            if children then
-                for _, model in ipairs(areaSlots:GetChildren()) do
-                    local hitbox = model:FindFirstChild("Hitbox") or model:FindFirstChildWhichIsA("BasePart", true)
-                    if hitbox then table.insert(targets, {Part = hitbox, Model = model}) end
-                end
+            for _, model in ipairs(areaSlots:GetChildren()) do
+                local hitbox = model:FindFirstChild("Hitbox") or model:FindFirstChildWhichIsA("BasePart", true)
+                if hitbox then table.insert(targets, {Part = hitbox, Model = model}) end
             end
         end
 
@@ -1300,7 +1285,6 @@ local function RunUniversalScript()
     local RunService       = game:GetService("RunService")
     local Lighting         = game:GetService("Lighting")
     local Players          = game:GetService("Players")
-    local CoreGui          = game:GetService("CoreGui")
     local Stats            = game:GetService("Stats")
     local LogService       = game:GetService("LogService")
     local LocalPlayer      = Players.LocalPlayer
@@ -1309,9 +1293,6 @@ local function RunUniversalScript()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     if PlayerGui:FindFirstChild("BrinelandUniversalHub") then
         PlayerGui.BrinelandUniversalHub:Destroy()
-    end
-    if PlayerGui:FindFirstChild("FlyMobileGUI") then
-        PlayerGui.FlyMobileGUI:Destroy()
     end
 
     local hubAlive = true
@@ -1600,7 +1581,7 @@ local function RunUniversalScript()
     end
 
     -- ============================================================
-    -- MAIN GUI (UNCHANGED DIMENSIONS: 360x440)
+    -- MAIN GUI (DIMENSIONS: 360x440)
     -- ============================================================
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "BrinelandUniversalHub"
@@ -2340,6 +2321,9 @@ local function RunUniversalScript()
     viewport.Size = UDim2.new(1, -8, 1, -22)
     viewport.Position = UDim2.new(0, 4, 0, 4)
     viewport.BackgroundTransparency = 1
+    viewport.Ambient = Color3.fromRGB(180, 190, 210)
+    viewport.LightColor = Color3.fromRGB(255, 255, 255)
+    viewport.LightDirection = Vector3.new(-1, -1, -1)
     viewport.Parent = avatarCard
 
     local avatarNameLbl = Instance.new("TextLabel")
@@ -2354,37 +2338,68 @@ local function RunUniversalScript()
     avatarNameLbl.TextXAlignment = Enum.TextXAlignment.Center
     avatarNameLbl.Parent = avatarCard
 
-    -- Setup 3D Character Model inside ViewportFrame
-    task.spawn(function()
-        pcall(function()
-            local model = LocalPlayer.Character
-            if model then
-                model = model:Clone()
-                for _, desc in ipairs(model:GetDescendants()) do
-                    if desc:IsA("Script") or desc:IsA("LocalScript") or desc:IsA("Humanoid") then
-                        pcall(function() desc:Destroy() end)
-                    end
-                end
-                local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-                if hrp then
-                    model:PivotTo(CFrame.new(0, 0, 0))
-                    viewport.CurrentCamera = Instance.new("Camera")
-                    viewport.CurrentCamera.CFrame = CFrame.new(Vector3.new(0, 2.5, 4.2), hrp.Position + Vector3.new(0, 0.8, 0))
-                    viewport.CurrentCamera.Parent = viewport
-                    model.Parent = viewport
+    -- Setup 3D Character Model inside ViewportFrame (with Archivable fix)
+    local activeViewportModel = nil
+    local activeViewportConn = nil
 
-                    -- Live rotation animation for 3D body preview
-                    local rotAngle = 0
-                    trackConn(RunService.RenderStepped:Connect(function(dt)
-                        if hubAlive and model.Parent and hrp then
-                            rotAngle = rotAngle + (dt * 45)
-                            model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(rotAngle), 0))
-                        end
-                    end))
+    local function Render3DCharacter(char)
+        if not char or not hubAlive then return end
+        pcall(function()
+            if activeViewportConn then
+                activeViewportConn:Disconnect()
+                activeViewportConn = nil
+            end
+            if activeViewportModel then
+                activeViewportModel:Destroy()
+                activeViewportModel = nil
+            end
+
+            char:WaitForChild("HumanoidRootPart", 5)
+            local prevArchivable = char.Archivable
+            char.Archivable = true
+            local model = char:Clone()
+            char.Archivable = prevArchivable
+
+            if not model then return end
+
+            for _, desc in ipairs(model:GetDescendants()) do
+                if desc:IsA("Script") or desc:IsA("LocalScript") or desc:IsA("Humanoid") or desc:IsA("BillboardGui") or desc:IsA("Highlight") then
+                    pcall(function() desc:Destroy() end)
+                elseif desc:IsA("BasePart") then
+                    desc.Anchored = true
                 end
             end
+
+            local hrp = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+            if hrp then
+                model:PivotTo(CFrame.new(0, 0, 0))
+                if not viewport.CurrentCamera then
+                    local vpCam = Instance.new("Camera")
+                    vpCam.Parent = viewport
+                    viewport.CurrentCamera = vpCam
+                end
+                viewport.CurrentCamera.CFrame = CFrame.new(Vector3.new(0, 1.5, 4.8), Vector3.new(0, 0.5, 0))
+                model.Parent = viewport
+                activeViewportModel = model
+
+                local rotAngle = 0
+                activeViewportConn = trackConn(RunService.RenderStepped:Connect(function(dt)
+                    if hubAlive and model.Parent then
+                        rotAngle = rotAngle + (dt * 45)
+                        model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(rotAngle), 0))
+                    end
+                end))
+            end
         end)
-    end)
+    end
+
+    if LocalPlayer.Character then
+        task.spawn(Render3DCharacter, LocalPlayer.Character)
+    end
+    trackConn(LocalPlayer.CharacterAdded:Connect(function(newChar)
+        task.wait(0.5)
+        Render3DCharacter(newChar)
+    end))
 
     -- Extra bottom stats (Players & Job ID strip)
     local bottomStatsRow = Instance.new("Frame")
@@ -2857,10 +2872,9 @@ elseif nameLower:find("speed keyboard escape") or nameLower:find("+1 speed") the
     local ok, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/SpeedKeyboardEscape.lua") end)
     if ok and res then loadstring(res)() end
 elseif nameLower:find("bake or die") or nameLower:find("bakeordie") or PlaceId == 86479448397834 or GameId == 7488668004 then
-    print("[BRINELAND] Detected Bake or Die. Loading bakeordie.lua & universal fly tools...")
+    print("[BRINELAND] Detected Bake or Die. Loading bakeordie.lua...")
     local ok, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/DCBHEROBRINE/BRINELAND-HUB/main/bakeordie.lua") end)
     if ok and res then loadstring(res)() end
-    RunUniversalScript()
 else
     print("[BRINELAND] Unrecognized game: " .. gameName .. " (PlaceId: " .. tostring(PlaceId) .. "). Running Universal Hub...")
     RunUniversalScript()
