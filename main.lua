@@ -1895,7 +1895,7 @@ local nameLower = gameName:lower()
 if nameLower:find("taxi boss") or PlaceId == 7305826609 then
     print("[BRINELAND] Detected Taxi Boss. Loading taxiboss.lua...")
     LoadExternalScript("taxiboss.lua")
-elseif nameLower:find("steal an egg") or nameLower:find("stealanegg") or PlaceId == 115049386348611 then
+elseif nameLower:find("steal an egg") or nameLower:find("stealanegg") or PlaceId == 107778070777162 or PlaceId == 115049386348611 then
     print("[BRINELAND] Detected Steal An Egg. Loading stealanegg.lua...")
     LoadExternalScript("stealanegg.lua")
 elseif nameLower:find("throw food for animals") or PlaceId == 120219252362013 or GameId == 10766972131 then
