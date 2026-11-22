@@ -150,7 +150,6 @@ local CUSTOM_BANNER_FILE = "brineland_banner.png"
 local CUSTOM_BANNER_ID   = ""
 
 -- Hidden background audio (heard only, no visible UI/tab)
--- Roblox cannot stream YouTube URLs directly; use a valid Roblox audio ID here.
 local HIDDEN_MUSIC_ID     = "rbxassetid://1843404009"
 local HIDDEN_MUSIC_VOLUME = 0.45
 
@@ -426,7 +425,7 @@ end
 VerifyAndLoadHub()
 
 -- ============================================================
--- UNIVERSAL HUB (COMPACT LEFT CORNER + NO HOME TAB + HIDDEN AUDIO)
+-- UNIVERSAL HUB (COMPACT LEFT CORNER + HOME TAB RESTORED + HIDDEN AUDIO)
 -- ============================================================
 local function RunUniversalScript()
     EnsureHiddenMusic()
@@ -832,7 +831,7 @@ local function RunUniversalScript()
     TabBar.BackgroundTransparency = 1
     TabBar.ScrollBarThickness = 2
     TabBar.ScrollBarImageColor3 = Theme.White
-    TabBar.CanvasSize = UDim2.new(0, 360, 0, 0)
+    TabBar.CanvasSize = UDim2.new(0, 420, 0, 0)
     TabBar.Parent = MainFrame
 
     local TabLayout = Instance.new("UIListLayout")
@@ -852,7 +851,7 @@ local function RunUniversalScript()
     tabDivider.Parent = MainFrame
 
     local TabFrames = {}
-    local activeTabName = "Info"
+    local activeTabName = "Home"
 
     local function SelectTab(tabName)
         activeTabName = tabName
@@ -864,6 +863,10 @@ local function RunUniversalScript()
                 TextColor3 = active and Theme.Black or Theme.SubText
             }):Play()
         end
+        TweenService:Create(HomeOvalBtn, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = (tabName == "Home") and Theme.White or Theme.MidGray,
+            TextColor3 = (tabName == "Home") and Theme.Black or Theme.White
+        }):Play()
     end
 
     local function CreateTab(tabName, widthPx)
@@ -903,17 +906,28 @@ local function RunUniversalScript()
         return container
     end
 
-    -- TABS: Info, TP, Player, Cheats, Visuals, Key (No Home tab, no visible music UI!)
-    local InfoTab      = CreateTab("Info", 52)
-    local TeleportsTab = CreateTab("TP", 44)
-    local PlayersTab   = CreateTab("Player", 58)
-    local CheatsTab    = CreateTab("Cheats", 58)
-    local VisualsTab   = CreateTab("Visuals", 64)
-    local KeyTab       = CreateTab("Key", 46)
+    -- TABS: Home, Info, TP, Player, Cheats, Visuals, Key (no visible music UI!)
+    local HomeTab      = CreateTab("Home", 52)
+    local InfoTab      = CreateTab("Info", 48)
+    local TeleportsTab = CreateTab("TP", 42)
+    local PlayersTab   = CreateTab("Player", 56)
+    local CheatsTab    = CreateTab("Cheats", 56)
+    local VisualsTab   = CreateTab("Visuals", 60)
+    local KeyTab       = CreateTab("Key", 44)
 
-    SelectTab("Info")
+    SelectTab("Home")
     HomeOvalBtn.MouseButton1Click:Connect(function()
-        SelectTab("Info")
+        if isCollapsed then
+            isCollapsed = false
+            TweenService:Create(MainFrame, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(HUB_WIDTH, HUB_HEIGHT)
+            }):Play()
+            TweenService:Create(ArrowCircleBtn, TweenInfo.new(0.2), { Rotation = 0 }):Play()
+            topDivider.Visible = true
+            tabDivider.Visible = true
+            TabBar.Visible = true
+        end
+        SelectTab("Home")
     end)
 
     local isCollapsed = false
@@ -1087,6 +1101,53 @@ local function RunUniversalScript()
             end
         end))
     end
+
+    -- ============================================================
+    -- HOME TAB
+    -- ============================================================
+    local welcomeCard = Instance.new("Frame")
+    welcomeCard.Size = UDim2.new(1, -2, 0, 72)
+    welcomeCard.BackgroundColor3 = Theme.DarkGray
+    welcomeCard.Parent = HomeTab
+    Instance.new("UICorner", welcomeCard).CornerRadius = UDim.new(0, 8)
+    addWhiteBoxStroke(welcomeCard, 1, 0.25)
+
+    local welcomeTitle = Instance.new("TextLabel")
+    welcomeTitle.Size = UDim2.new(1, -16, 0, 24)
+    welcomeTitle.Position = UDim2.new(0, 10, 0, 6)
+    welcomeTitle.BackgroundTransparency = 1
+    welcomeTitle.Text = "Welcome, " .. LocalPlayer.DisplayName
+    welcomeTitle.TextColor3 = Theme.White
+    welcomeTitle.Font = FANCY_FONT
+    welcomeTitle.TextSize = 17
+    welcomeTitle.TextXAlignment = Enum.TextXAlignment.Left
+    welcomeTitle.Parent = welcomeCard
+
+    local welcomeSub = Instance.new("TextLabel")
+    welcomeSub.Size = UDim2.new(1, -16, 0, 34)
+    welcomeSub.Position = UDim2.new(0, 10, 0, 32)
+    welcomeSub.BackgroundTransparency = 1
+    welcomeSub.Text = "Brineland Universal Hub • Place ID: " .. tostring(game.PlaceId)
+    welcomeSub.TextColor3 = Theme.SubText
+    welcomeSub.Font = BODY_FONT
+    welcomeSub.TextSize = 9.5
+    welcomeSub.TextWrapped = true
+    welcomeSub.TextXAlignment = Enum.TextXAlignment.Left
+    welcomeSub.Parent = welcomeCard
+
+    CreateButton(HomeTab, "Open Server & Console Info", function()
+        SelectTab("Info")
+    end)
+
+    CreateButton(HomeTab, "Open Cheats & Movement", function()
+        SelectTab("Cheats")
+    end)
+
+    CreateButton(HomeTab, "Copy Discord Invite", function()
+        if fSetClipboard then
+            fSetClipboard(DISCORD_INVITE)
+        end
+    end)
 
     -- ============================================================
     -- TP TAB
