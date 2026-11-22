@@ -274,7 +274,7 @@ local function VerifyAndLoadHub()
     ScreenGui.Parent = PlayerGui
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(350, 235)
+    MainFrame.Size = UDim2.fromOffset(420, 235)
     MainFrame.Position = UDim2.fromOffset(16, 48)
     MainFrame.BackgroundColor3 = Theme.Black
     MainFrame.BackgroundTransparency = 0.06
@@ -405,7 +405,7 @@ local function VerifyAndLoadHub()
             end
             task.wait(0.45)
             local outTween = TweenService:Create(MainFrame, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
-                Size = UDim2.fromOffset(350, 0),
+                Size = UDim2.fromOffset(420, 0),
                 BackgroundTransparency = 1
             })
             outTween:Play()
@@ -425,7 +425,7 @@ end
 VerifyAndLoadHub()
 
 -- ============================================================
--- UNIVERSAL HUB (COMPACT LEFT CORNER + HOME TAB RESTORED + HIDDEN AUDIO)
+-- UNIVERSAL HUB (WIDER SIDEWAYS + TOP-RIGHT HOME BTN ONLY + HIDDEN AUDIO)
 -- ============================================================
 local function RunUniversalScript()
     EnsureHiddenMusic()
@@ -731,7 +731,8 @@ local function RunUniversalScript()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = PlayerGui
 
-    local HUB_WIDTH = 350
+    -- Wider sideways (420px), same compact height (315px)
+    local HUB_WIDTH = 420
     local HUB_HEIGHT = 315
 
     local MainFrame = Instance.new("Frame")
@@ -771,6 +772,7 @@ local function RunUniversalScript()
 
     MakeDraggable(MainFrame, TopBar)
 
+    -- Top-right Home button (opens Home view; no Home button in the tab bar)
     local HomeOvalBtn = Instance.new("TextButton")
     HomeOvalBtn.Size = UDim2.fromOffset(50, 24)
     HomeOvalBtn.Position = UDim2.new(1, -120, 0.5, -12)
@@ -858,10 +860,12 @@ local function RunUniversalScript()
         for name, data in pairs(TabFrames) do
             local active = (name == tabName)
             data.Container.Visible = active
-            TweenService:Create(data.Button, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                BackgroundColor3 = active and Theme.White or Theme.DarkGray,
-                TextColor3 = active and Theme.Black or Theme.SubText
-            }):Play()
+            if data.Button then
+                TweenService:Create(data.Button, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    BackgroundColor3 = active and Theme.White or Theme.DarkGray,
+                    TextColor3 = active and Theme.Black or Theme.SubText
+                }):Play()
+            end
         end
         TweenService:Create(HomeOvalBtn, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             BackgroundColor3 = (tabName == "Home") and Theme.White or Theme.MidGray,
@@ -869,17 +873,25 @@ local function RunUniversalScript()
         }):Play()
     end
 
-    local function CreateTab(tabName, widthPx)
-        local tabBtn = Instance.new("TextButton")
-        tabBtn.Size = UDim2.fromOffset(widthPx or 56, 23)
-        tabBtn.BackgroundColor3 = Theme.DarkGray
-        tabBtn.Text = tabName
-        tabBtn.TextColor3 = Theme.SubText
-        tabBtn.Font = BODY_FONT
-        tabBtn.TextSize = 8.5
-        tabBtn.Parent = TabBar
-        Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(1, 0)
-        addWhiteBoxStroke(tabBtn, 1, 0.35)
+    -- Create a container for a view; pass showInTabBar = false for Home (accessed via top-right Home button)
+    local function CreateTab(tabName, widthPx, showInTabBar)
+        local tabBtn = nil
+        if showInTabBar ~= false then
+            tabBtn = Instance.new("TextButton")
+            tabBtn.Size = UDim2.fromOffset(widthPx or 56, 23)
+            tabBtn.BackgroundColor3 = Theme.DarkGray
+            tabBtn.Text = tabName
+            tabBtn.TextColor3 = Theme.SubText
+            tabBtn.Font = BODY_FONT
+            tabBtn.TextSize = 8.5
+            tabBtn.Parent = TabBar
+            Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(1, 0)
+            addWhiteBoxStroke(tabBtn, 1, 0.35)
+
+            tabBtn.MouseButton1Click:Connect(function()
+                SelectTab(tabName)
+            end)
+        end
 
         local container = Instance.new("ScrollingFrame")
         container.Size = UDim2.new(1, -14, 1, -83)
@@ -899,21 +911,17 @@ local function RunUniversalScript()
         end)
 
         TabFrames[tabName] = { Button = tabBtn, Container = container }
-        tabBtn.MouseButton1Click:Connect(function()
-            SelectTab(tabName)
-        end)
-
         return container
     end
 
-    -- TABS: Home, Info, TP, Player, Cheats, Visuals, Key (no visible music UI!)
-    local HomeTab      = CreateTab("Home", 52)
-    local InfoTab      = CreateTab("Info", 48)
-    local TeleportsTab = CreateTab("TP", 42)
-    local PlayersTab   = CreateTab("Player", 56)
-    local CheatsTab    = CreateTab("Cheats", 56)
-    local VisualsTab   = CreateTab("Visuals", 60)
-    local KeyTab       = CreateTab("Key", 44)
+    -- Home view is NOT in the tab bar; opened by pressing the top-right Home button
+    local HomeTab      = CreateTab("Home", 52, false)
+    local InfoTab      = CreateTab("Info", 52, true)
+    local TeleportsTab = CreateTab("TP", 46, true)
+    local PlayersTab   = CreateTab("Player", 62, true)
+    local CheatsTab    = CreateTab("Cheats", 62, true)
+    local VisualsTab   = CreateTab("Visuals", 66, true)
+    local KeyTab       = CreateTab("Key", 48, true)
 
     SelectTab("Home")
     HomeOvalBtn.MouseButton1Click:Connect(function()
@@ -1103,7 +1111,7 @@ local function RunUniversalScript()
     end
 
     -- ============================================================
-    -- HOME TAB
+    -- HOME VIEW (OPENED VIA TOP-RIGHT HOME BUTTON)
     -- ============================================================
     local welcomeCard = Instance.new("Frame")
     welcomeCard.Size = UDim2.new(1, -2, 0, 72)
