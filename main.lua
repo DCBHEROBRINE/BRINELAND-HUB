@@ -144,19 +144,15 @@ end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- CUSTOM ASSETS, SONGS & MONOCHROME THEME
+-- CUSTOM ASSETS, HIDDEN MUSIC & MONOCHROME THEME
 -- ============================================================
--- Put a custom image in executor workspace (e.g. "brineland_banner.png")
--- OR set CUSTOM_BANNER_ID to "rbxassetid://YOUR_ASSET_ID"
 local CUSTOM_BANNER_FILE = "brineland_banner.png"
 local CUSTOM_BANNER_ID   = ""
 
-local SONG_PLAYLIST = {
-    { Name = "Track 01 - Night Drive",  SoundId = "rbxassetid://1843404009" },
-    { Name = "Track 02 - Dark Synth",   SoundId = "rbxassetid://1837849285" },
-    { Name = "Track 03 - Lo-Fi Focus",  SoundId = "rbxassetid://9043887091" },
-    { Name = "Track 04 - Arcade Pulse", SoundId = "rbxassetid://1846078556" },
-}
+-- Hidden background audio (heard only, no visible UI/tab)
+-- Roblox cannot stream YouTube URLs directly; use a valid Roblox audio ID here.
+local HIDDEN_MUSIC_ID     = "rbxassetid://1843404009"
+local HIDDEN_MUSIC_VOLUME = 0.45
 
 local Theme = {
     Black      = Color3.fromRGB(10, 10, 12),
@@ -193,15 +189,72 @@ local function resolveCustomBannerImage()
     return ""
 end
 
--- ============================================================
--- BRINELAND CUSTOM UI GATEWAY (PLATOBOOST INTEGRATED)
--- ============================================================
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 local KEY_FILE_NAME = "BrinelandKey.txt"
 
+local function EnsureHiddenMusic()
+    if not HIDDEN_MUSIC_ID or HIDDEN_MUSIC_ID == "" then return end
+    local existing = SoundService:FindFirstChild("BrinelandHiddenMusic")
+    if existing and existing:IsA("Sound") then
+        if not existing.IsPlaying then
+            pcall(function() existing:Play() end)
+        end
+        return existing
+    end
+
+    local s = Instance.new("Sound")
+    s.Name = "BrinelandHiddenMusic"
+    s.SoundId = HIDDEN_MUSIC_ID
+    s.Volume = HIDDEN_MUSIC_VOLUME
+    s.Looped = true
+    s.Parent = SoundService
+    pcall(function() s:Play() end)
+    return s
+end
+
+local function MakeDraggable(guiObject, dragHandle)
+    local handle = dragHandle or guiObject
+    local dragging = false
+    local dragStart = Vector2.zero
+    local startPos = guiObject.Position
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = guiObject.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            guiObject.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- ============================================================
+-- BRINELAND CUSTOM UI GATEWAY (MOVABLE KEY GUI)
+-- ============================================================
 local function VerifyAndLoadHub()
+    EnsureHiddenMusic()
+
     if readfile and isfile and isfile(KEY_FILE_NAME) then
         local savedKey = readfile(KEY_FILE_NAME)
         if savedKey and savedKey ~= "" then
@@ -240,6 +293,8 @@ local function VerifyAndLoadHub()
     Title.TextSize = 20
     Title.Font = FANCY_FONT
     Title.Parent = MainFrame
+
+    MakeDraggable(MainFrame, Title)
 
     local headerLine = Instance.new("Frame")
     headerLine.Size = UDim2.new(1, -16, 0, 1)
@@ -371,16 +426,16 @@ end
 VerifyAndLoadHub()
 
 -- ============================================================
--- UNIVERSAL HUB (COMPACT LEFT CORNER + NO HOME TAB + SONGS)
+-- UNIVERSAL HUB (COMPACT LEFT CORNER + NO HOME TAB + HIDDEN AUDIO)
 -- ============================================================
 local function RunUniversalScript()
-    local UserInputService = game:GetService("UserInputService")
+    EnsureHiddenMusic()
+
     local Workspace        = game:GetService("Workspace")
     local RunService       = game:GetService("RunService")
     local Lighting         = game:GetService("Lighting")
     local Stats            = game:GetService("Stats")
     local LogService       = game:GetService("LogService")
-    local SoundService     = game:GetService("SoundService")
     local Camera           = Workspace.CurrentCamera
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -393,21 +448,6 @@ local function RunUniversalScript()
     local function trackConn(c)
         table.insert(hubConns, c)
         return c
-    end
-
-    local musicSound = Instance.new("Sound")
-    musicSound.Name = "BrinelandMusicPlayer"
-    musicSound.Looped = true
-    musicSound.Volume = 0.5
-    musicSound.Parent = SoundService
-    local currentTrackIndex = 1
-
-    local function playTrack(idx)
-        if #SONG_PLAYLIST == 0 then return end
-        currentTrackIndex = ((idx - 1) % #SONG_PLAYLIST) + 1
-        local track = SONG_PLAYLIST[currentTrackIndex]
-        musicSound.SoundId = track.SoundId
-        musicSound:Play()
     end
 
     local Config = {
@@ -692,7 +732,6 @@ local function RunUniversalScript()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = PlayerGui
 
-    -- Compact size so it is not overly tall
     local HUB_WIDTH = 350
     local HUB_HEIGHT = 315
 
@@ -731,7 +770,8 @@ local function RunUniversalScript()
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TopBar
 
-    -- Oval Home button (jumps straight to Info view, NO separate Home tab)
+    MakeDraggable(MainFrame, TopBar)
+
     local HomeOvalBtn = Instance.new("TextButton")
     HomeOvalBtn.Size = UDim2.fromOffset(50, 24)
     HomeOvalBtn.Position = UDim2.new(1, -120, 0.5, -12)
@@ -743,7 +783,6 @@ local function RunUniversalScript()
     HomeOvalBtn.Parent = TopBar
     Instance.new("UICorner", HomeOvalBtn).CornerRadius = UDim.new(1, 0)
 
-    -- Circular Arrow button
     local ArrowCircleBtn = Instance.new("TextButton")
     ArrowCircleBtn.Size = UDim2.fromOffset(26, 26)
     ArrowCircleBtn.Position = UDim2.new(1, -62, 0.5, -13)
@@ -756,7 +795,6 @@ local function RunUniversalScript()
     Instance.new("UICorner", ArrowCircleBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(ArrowCircleBtn, 1, 0.2)
 
-    -- Circular Close button
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Size = UDim2.fromOffset(26, 26)
     CloseBtn.Position = UDim2.new(1, -32, 0.5, -13)
@@ -772,7 +810,6 @@ local function RunUniversalScript()
         hubAlive = false
         for _, c in ipairs(hubConns) do pcall(function() c:Disconnect() end) end
         DisableFly()
-        pcall(function() musicSound:Stop(); musicSound:Destroy() end)
         local closeTween = TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
             Size = UDim2.fromOffset(HUB_WIDTH, 0),
             BackgroundTransparency = 1
@@ -795,7 +832,7 @@ local function RunUniversalScript()
     TabBar.BackgroundTransparency = 1
     TabBar.ScrollBarThickness = 2
     TabBar.ScrollBarImageColor3 = Theme.White
-    TabBar.CanvasSize = UDim2.new(0, 470, 0, 0)
+    TabBar.CanvasSize = UDim2.new(0, 360, 0, 0)
     TabBar.Parent = MainFrame
 
     local TabLayout = Instance.new("UIListLayout")
@@ -866,14 +903,13 @@ local function RunUniversalScript()
         return container
     end
 
-    -- TABS: Info, TP, Player, Cheats, Visuals, Songs, Key (No Home tab!)
-    local InfoTab      = CreateTab("Info", 50)
-    local TeleportsTab = CreateTab("TP", 42)
-    local PlayersTab   = CreateTab("Player", 56)
-    local CheatsTab    = CreateTab("Cheats", 56)
-    local VisualsTab   = CreateTab("Visuals", 62)
-    local SongsTab     = CreateTab("Songs", 56)
-    local KeyTab       = CreateTab("Key", 44)
+    -- TABS: Info, TP, Player, Cheats, Visuals, Key (No Home tab, no visible music UI!)
+    local InfoTab      = CreateTab("Info", 52)
+    local TeleportsTab = CreateTab("TP", 44)
+    local PlayersTab   = CreateTab("Player", 58)
+    local CheatsTab    = CreateTab("Cheats", 58)
+    local VisualsTab   = CreateTab("Visuals", 64)
+    local KeyTab       = CreateTab("Key", 46)
 
     SelectTab("Info")
     HomeOvalBtn.MouseButton1Click:Connect(function()
@@ -906,20 +942,6 @@ local function RunUniversalScript()
             end
         end
     end)
-
-    local dragging, dragStart, startPos
-    TopBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
-        end
-    end)
-    trackConn(UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end))
-    trackConn(UserInputService.InputEnded:Connect(function() dragging = false end))
 
     local function CreateButton(parentContainer, text, callback)
         local frame = Instance.new("Frame")
@@ -1284,91 +1306,6 @@ local function RunUniversalScript()
 
     CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
     CreateToggle(VisualsTab, "Clean Vision (Fullbright & No Fog)", function(state) ToggleCleanVision(state) end)
-
-    -- ============================================================
-    -- SONGS TAB CONTROLS
-    -- ============================================================
-    local nowPlayingCard = Instance.new("Frame")
-    nowPlayingCard.Size = UDim2.new(1, -2, 0, 36)
-    nowPlayingCard.BackgroundColor3 = Theme.DarkGray
-    nowPlayingCard.Parent = SongsTab
-    Instance.new("UICorner", nowPlayingCard).CornerRadius = UDim.new(0, 8)
-    addWhiteBoxStroke(nowPlayingCard, 1, 0.25)
-
-    local nowPlayingLbl = Instance.new("TextLabel")
-    nowPlayingLbl.Size = UDim2.new(1, -14, 1, 0)
-    nowPlayingLbl.Position = UDim2.new(0, 7, 0, 0)
-    nowPlayingLbl.BackgroundTransparency = 1
-    nowPlayingLbl.Text = "Now Playing: None (Stopped)"
-    nowPlayingLbl.TextColor3 = Theme.White
-    nowPlayingLbl.Font = BODY_FONT
-    nowPlayingLbl.TextSize = 10
-    nowPlayingLbl.TextXAlignment = Enum.TextXAlignment.Left
-    nowPlayingLbl.TextTruncate = Enum.TextTruncate.AtEnd
-    nowPlayingLbl.Parent = nowPlayingCard
-
-    local function updateNowPlayingLabel()
-        local track = SONG_PLAYLIST[currentTrackIndex]
-        if track then
-            local stateText = musicSound.IsPlaying and "Playing" or "Paused"
-            nowPlayingLbl.Text = string.format("[%s] %s", stateText, track.Name)
-        end
-    end
-
-    local transportRow = Instance.new("Frame")
-    transportRow.Size = UDim2.new(1, -2, 0, 30)
-    transportRow.BackgroundTransparency = 1
-    transportRow.Parent = SongsTab
-
-    local function makeTransportBtn(txt, xScale, xOff, cb)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0.24, -3, 1, 0)
-        b.Position = UDim2.new(xScale, xOff, 0, 0)
-        b.BackgroundColor3 = Theme.DarkGray
-        b.Text = txt
-        b.TextColor3 = Theme.White
-        b.Font = BODY_FONT
-        b.TextSize = 9.5
-        b.Parent = transportRow
-        Instance.new("UICorner", b).CornerRadius = UDim.new(1, 0)
-        addWhiteBoxStroke(b, 1, 0.25)
-        b.MouseButton1Click:Connect(cb)
-    end
-
-    makeTransportBtn("PREV", 0, 0, function()
-        playTrack(currentTrackIndex - 1)
-        updateNowPlayingLabel()
-    end)
-
-    makeTransportBtn("PLAY", 0.25, 2, function()
-        if musicSound.SoundId == "" then
-            playTrack(currentTrackIndex)
-        else
-            musicSound:Play()
-        end
-        updateNowPlayingLabel()
-    end)
-
-    makeTransportBtn("PAUSE", 0.50, 4, function()
-        musicSound:Pause()
-        updateNowPlayingLabel()
-    end)
-
-    makeTransportBtn("NEXT", 0.75, 6, function()
-        playTrack(currentTrackIndex + 1)
-        updateNowPlayingLabel()
-    end)
-
-    CreateSlider(SongsTab, "Volume (%)", 0, 100, 50, true, function(val)
-        musicSound.Volume = val / 100
-    end)
-
-    for i, track in ipairs(SONG_PLAYLIST) do
-        CreateButton(SongsTab, track.Name, function()
-            playTrack(i)
-            updateNowPlayingLabel()
-        end)
-    end
 
     -- ============================================================
     -- KEY TAB
