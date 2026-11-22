@@ -2,6 +2,7 @@
 -- BRINELAND MASTER MULTI-GAME HUB + PLATOBOOST KEY SYSTEM
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 -- Discord: https://discord.gg/epWMbuXSN5
+-- YouTube: https://youtube.com/@dcb_herobrine?si=PN8mSo36sJFaySFQ
 -- ============================================================
 
 -------------------------------------------------------------------------------
@@ -12,8 +13,9 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 -------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------
---! PLATOBOOST CONFIGURATION
+--! PLATOBOOST & SOCIAL CONFIGURATION
 local DISCORD_INVITE = "https://discord.gg/epWMbuXSN5"
+local YOUTUBE_URL    = "https://youtube.com/@dcb_herobrine?si=PN8mSo36sJFaySFQ"
 local service = 34545;
 local secret = "8ad7b367-0fc1-442d-9c99-02298ea45d0c";
 local useNonce = true;
@@ -149,8 +151,8 @@ end
 local CUSTOM_BANNER_FILE = "brineland_banner.png"
 local CUSTOM_BANNER_ID   = ""
 
--- Hidden background audio (heard only, no visible UI/tab)
-local HIDDEN_MUSIC_ID     = "rbxassetid://1843404009"
+-- Hidden background audio (Asset ID 108997017247273)
+local HIDDEN_MUSIC_ID     = "rbxassetid://108997017247273"
 local HIDDEN_MUSIC_VOLUME = 0.45
 
 local Theme = {
@@ -199,6 +201,8 @@ local function EnsureHiddenMusic()
     if not HIDDEN_MUSIC_ID or HIDDEN_MUSIC_ID == "" then return end
     local existing = SoundService:FindFirstChild("BrinelandHiddenMusic")
     if existing and existing:IsA("Sound") then
+        existing.SoundId = HIDDEN_MUSIC_ID
+        existing.Volume = HIDDEN_MUSIC_VOLUME
         if not existing.IsPlaying then
             pcall(function() existing:Play() end)
         end
@@ -255,9 +259,10 @@ local function VerifyAndLoadHub()
     EnsureHiddenMusic()
 
     if readfile and isfile and isfile(KEY_FILE_NAME) then
-        local savedKey = readfile(KEY_FILE_NAME)
-        if savedKey and savedKey ~= "" then
-            if verifyKey(savedKey) then
+        local okRead, savedKey = pcall(readfile, KEY_FILE_NAME)
+        if okRead and savedKey and savedKey ~= "" then
+            savedKey = savedKey:gsub("%s+", "")
+            if savedKey ~= "" and verifyKey(savedKey) then
                 return true
             end
         end
@@ -385,7 +390,7 @@ local function VerifyAndLoadHub()
     local isVerified = false
 
     SubmitBtn.MouseButton1Click:Connect(function()
-        local enteredKey = KeyInput.Text
+        local enteredKey = (KeyInput.Text or ""):gsub("%s+", "")
         if enteredKey == "" then
             StatusLabel.Text = "Please enter a key first!"
             StatusLabel.TextColor3 = Theme.SubText
@@ -425,7 +430,7 @@ end
 VerifyAndLoadHub()
 
 -- ============================================================
--- UNIVERSAL HUB (WIDER SIDEWAYS + TOP-RIGHT HOME BTN ONLY + HIDDEN AUDIO)
+-- UNIVERSAL HUB (WIDER SIDEWAYS + CLEAN HOME LAYOUT + HIDDEN AUDIO)
 -- ============================================================
 local function RunUniversalScript()
     EnsureHiddenMusic()
@@ -547,6 +552,10 @@ local function RunUniversalScript()
 
         Config.FlyEnabled = true
         humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+        if moveConnections.FlightLoop then
+            moveConnections.FlightLoop:Disconnect()
+        end
 
         moveConnections.FlightLoop = RunService.Heartbeat:Connect(function(deltaTime)
             if not Config.FlyEnabled or not rootPart or not char:IsDescendantOf(Workspace) then return end
@@ -731,7 +740,6 @@ local function RunUniversalScript()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = PlayerGui
 
-    -- Wider sideways (420px), same compact height (315px)
     local HUB_WIDTH = 420
     local HUB_HEIGHT = 315
 
@@ -750,6 +758,13 @@ local function RunUniversalScript()
     TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
         Size = UDim2.fromOffset(HUB_WIDTH, HUB_HEIGHT)
     }):Play()
+
+    -- Allow RightShift on PC to hide/show the panel
+    trackConn(UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.RightShift then
+            MainFrame.Visible = not MainFrame.Visible
+        end
+    end))
 
     local TopBar = Instance.new("Frame")
     TopBar.Size = UDim2.new(1, 0, 0, 40)
@@ -854,6 +869,7 @@ local function RunUniversalScript()
 
     local TabFrames = {}
     local activeTabName = "Home"
+    local isCollapsed = false
 
     local function SelectTab(tabName)
         activeTabName = tabName
@@ -874,7 +890,7 @@ local function RunUniversalScript()
     end
 
     -- Create a container for a view; pass showInTabBar = false for Home (accessed via top-right Home button)
-    local function CreateTab(tabName, widthPx, showInTabBar)
+    local function CreateTab(tabName, widthPx, showInTabBar, customScroll)
         local tabBtn = nil
         if showInTabBar ~= false then
             tabBtn = Instance.new("TextButton")
@@ -893,29 +909,39 @@ local function RunUniversalScript()
             end)
         end
 
-        local container = Instance.new("ScrollingFrame")
-        container.Size = UDim2.new(1, -14, 1, -83)
-        container.Position = UDim2.new(0, 7, 0, 80)
-        container.BackgroundTransparency = 1
-        container.ScrollBarThickness = 3
-        container.ScrollBarImageColor3 = Theme.White
-        container.Visible = false
-        container.Parent = MainFrame
+        local container
+        if customScroll == false then
+            container = Instance.new("Frame")
+            container.Size = UDim2.new(1, -14, 1, -83)
+            container.Position = UDim2.new(0, 7, 0, 80)
+            container.BackgroundTransparency = 1
+            container.Visible = false
+            container.Parent = MainFrame
+        else
+            container = Instance.new("ScrollingFrame")
+            container.Size = UDim2.new(1, -14, 1, -83)
+            container.Position = UDim2.new(0, 7, 0, 80)
+            container.BackgroundTransparency = 1
+            container.ScrollBarThickness = 3
+            container.ScrollBarImageColor3 = Theme.White
+            container.Visible = false
+            container.Parent = MainFrame
 
-        local listLayout = Instance.new("UIListLayout")
-        listLayout.Padding = UDim.new(0, 6)
-        listLayout.Parent = container
+            local listLayout = Instance.new("UIListLayout")
+            listLayout.Padding = UDim.new(0, 6)
+            listLayout.Parent = container
 
-        listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            container.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 12)
-        end)
+            listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                container.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 12)
+            end)
+        end
 
         TabFrames[tabName] = { Button = tabBtn, Container = container }
         return container
     end
 
     -- Home view is NOT in the tab bar; opened by pressing the top-right Home button
-    local HomeTab      = CreateTab("Home", 52, false)
+    local HomeTab      = CreateTab("Home", 52, false, false)
     local InfoTab      = CreateTab("Info", 52, true)
     local TeleportsTab = CreateTab("TP", 46, true)
     local PlayersTab   = CreateTab("Player", 62, true)
@@ -938,7 +964,6 @@ local function RunUniversalScript()
         SelectTab("Home")
     end)
 
-    local isCollapsed = false
     ArrowCircleBtn.MouseButton1Click:Connect(function()
         isCollapsed = not isCollapsed
         if isCollapsed then
@@ -1111,51 +1136,194 @@ local function RunUniversalScript()
     end
 
     -- ============================================================
-    -- HOME VIEW (OPENED VIA TOP-RIGHT HOME BUTTON)
+    -- HOME VIEW (MATCHING WHITE-CIRCLED REFERENCE LAYOUT)
     -- ============================================================
-    local welcomeCard = Instance.new("Frame")
-    welcomeCard.Size = UDim2.new(1, -2, 0, 72)
-    welcomeCard.BackgroundColor3 = Theme.DarkGray
-    welcomeCard.Parent = HomeTab
-    Instance.new("UICorner", welcomeCard).CornerRadius = UDim.new(0, 8)
-    addWhiteBoxStroke(welcomeCard, 1, 0.25)
+    -- 1. Left Welcome Text Block
+    local welcomeHeading = Instance.new("TextLabel")
+    welcomeHeading.Size = UDim2.new(0.62, 0, 0, 34)
+    welcomeHeading.Position = UDim2.new(0, 6, 0, 2)
+    welcomeHeading.BackgroundTransparency = 1
+    welcomeHeading.Text = "Welcome back to\nBRINELAND HUB"
+    welcomeHeading.TextColor3 = Theme.White
+    welcomeHeading.Font = BODY_FONT
+    welcomeHeading.TextSize = 13
+    welcomeHeading.TextWrapped = true
+    welcomeHeading.TextXAlignment = Enum.TextXAlignment.Left
+    welcomeHeading.TextYAlignment = Enum.TextYAlignment.Top
+    welcomeHeading.Parent = HomeTab
 
-    local welcomeTitle = Instance.new("TextLabel")
-    welcomeTitle.Size = UDim2.new(1, -16, 0, 24)
-    welcomeTitle.Position = UDim2.new(0, 10, 0, 6)
-    welcomeTitle.BackgroundTransparency = 1
-    welcomeTitle.Text = "Welcome, " .. LocalPlayer.DisplayName
-    welcomeTitle.TextColor3 = Theme.White
-    welcomeTitle.Font = FANCY_FONT
-    welcomeTitle.TextSize = 17
-    welcomeTitle.TextXAlignment = Enum.TextXAlignment.Left
-    welcomeTitle.Parent = welcomeCard
+    local welcomeDesc = Instance.new("TextLabel")
+    welcomeDesc.Size = UDim2.new(0.62, 0, 0, 56)
+    welcomeDesc.Position = UDim2.new(0, 6, 0, 38)
+    welcomeDesc.BackgroundTransparency = 1
+    welcomeDesc.Text = "Fast, clean and always up to date.\nTeleports, player warp, combat & ESP.\nWorks on PC, phone and every executor.\nPress RightShift to hide the panel."
+    welcomeDesc.TextColor3 = Theme.SubText
+    welcomeDesc.Font = Enum.Font.Gotham
+    welcomeDesc.TextSize = 9.5
+    welcomeDesc.TextWrapped = true
+    welcomeDesc.TextXAlignment = Enum.TextXAlignment.Left
+    welcomeDesc.TextYAlignment = Enum.TextYAlignment.Top
+    welcomeDesc.Parent = HomeTab
 
-    local welcomeSub = Instance.new("TextLabel")
-    welcomeSub.Size = UDim2.new(1, -16, 0, 34)
-    welcomeSub.Position = UDim2.new(0, 10, 0, 32)
-    welcomeSub.BackgroundTransparency = 1
-    welcomeSub.Text = "Brineland Universal Hub • Place ID: " .. tostring(game.PlaceId)
-    welcomeSub.TextColor3 = Theme.SubText
-    welcomeSub.Font = BODY_FONT
-    welcomeSub.TextSize = 9.5
-    welcomeSub.TextWrapped = true
-    welcomeSub.TextXAlignment = Enum.TextXAlignment.Left
-    welcomeSub.Parent = welcomeCard
+    -- Right-side compact status badge
+    local rightBadge = Instance.new("Frame")
+    rightBadge.Size = UDim2.new(0.35, -6, 0, 88)
+    rightBadge.Position = UDim2.new(0.65, 2, 0, 4)
+    rightBadge.BackgroundColor3 = Theme.DarkGray
+    rightBadge.Parent = HomeTab
+    Instance.new("UICorner", rightBadge).CornerRadius = UDim.new(0, 10)
+    addWhiteBoxStroke(rightBadge, 1, 0.25)
 
-    CreateButton(HomeTab, "Open Server & Console Info", function()
-        SelectTab("Info")
-    end)
+    local badgeTitle = Instance.new("TextLabel")
+    badgeTitle.Size = UDim2.new(1, -10, 0, 26)
+    badgeTitle.Position = UDim2.new(0, 5, 0, 8)
+    badgeTitle.BackgroundTransparency = 1
+    badgeTitle.Text = "BRINELAND"
+    badgeTitle.TextColor3 = Theme.White
+    badgeTitle.Font = FANCY_FONT
+    badgeTitle.TextSize = 16
+    badgeTitle.Parent = rightBadge
 
-    CreateButton(HomeTab, "Open Cheats & Movement", function()
-        SelectTab("Cheats")
-    end)
+    local badgeSub = Instance.new("TextLabel")
+    badgeSub.Size = UDim2.new(1, -10, 0, 44)
+    badgeSub.Position = UDim2.new(0, 5, 0, 36)
+    badgeSub.BackgroundTransparency = 1
+    badgeSub.Text = "UNIVERSAL\nEDITION\n@" .. LocalPlayer.Name
+    badgeSub.TextColor3 = Theme.SubText
+    badgeSub.Font = BODY_FONT
+    badgeSub.TextSize = 8.5
+    badgeSub.TextWrapped = true
+    badgeSub.Parent = rightBadge
 
-    CreateButton(HomeTab, "Copy Discord Invite", function()
+    -- 2. Discord & YouTube Link Buttons Row
+    local socialRow = Instance.new("Frame")
+    socialRow.Size = UDim2.new(1, -8, 0, 32)
+    socialRow.Position = UDim2.new(0, 4, 0, 100)
+    socialRow.BackgroundTransparency = 1
+    socialRow.Parent = HomeTab
+
+    local discordSocialBtn = Instance.new("TextButton")
+    discordSocialBtn.Size = UDim2.new(0.49, -2, 1, 0)
+    discordSocialBtn.Position = UDim2.new(0, 0, 0, 0)
+    discordSocialBtn.BackgroundColor3 = Theme.DarkGray
+    discordSocialBtn.Text = "DISCORD"
+    discordSocialBtn.TextColor3 = Theme.White
+    discordSocialBtn.Font = BODY_FONT
+    discordSocialBtn.TextSize = 10
+    discordSocialBtn.Parent = socialRow
+    Instance.new("UICorner", discordSocialBtn).CornerRadius = UDim.new(0, 8)
+    addWhiteBoxStroke(discordSocialBtn, 1, 0.25)
+
+    discordSocialBtn.MouseButton1Click:Connect(function()
         if fSetClipboard then
-            fSetClipboard(DISCORD_INVITE)
+            pcall(fSetClipboard, DISCORD_INVITE)
+            discordSocialBtn.Text = "COPIED DISCORD!"
+            discordSocialBtn.BackgroundColor3 = Theme.White
+            discordSocialBtn.TextColor3 = Theme.Black
+            task.delay(1.4, function()
+                if hubAlive and discordSocialBtn.Parent then
+                    discordSocialBtn.Text = "DISCORD"
+                    discordSocialBtn.BackgroundColor3 = Theme.DarkGray
+                    discordSocialBtn.TextColor3 = Theme.White
+                end
+            end)
         end
     end)
+
+    local youtubeSocialBtn = Instance.new("TextButton")
+    youtubeSocialBtn.Size = UDim2.new(0.49, -2, 1, 0)
+    youtubeSocialBtn.Position = UDim2.new(0.51, 2, 0, 0)
+    youtubeSocialBtn.BackgroundColor3 = Theme.DarkGray
+    youtubeSocialBtn.Text = "YOUTUBE"
+    youtubeSocialBtn.TextColor3 = Theme.White
+    youtubeSocialBtn.Font = BODY_FONT
+    youtubeSocialBtn.TextSize = 10
+    youtubeSocialBtn.Parent = socialRow
+    Instance.new("UICorner", youtubeSocialBtn).CornerRadius = UDim.new(0, 8)
+    addWhiteBoxStroke(youtubeSocialBtn, 1, 0.25)
+
+    youtubeSocialBtn.MouseButton1Click:Connect(function()
+        if fSetClipboard then
+            pcall(fSetClipboard, YOUTUBE_URL)
+            youtubeSocialBtn.Text = "COPIED YOUTUBE!"
+            youtubeSocialBtn.BackgroundColor3 = Theme.White
+            youtubeSocialBtn.TextColor3 = Theme.Black
+            task.delay(1.4, function()
+                if hubAlive and youtubeSocialBtn.Parent then
+                    youtubeSocialBtn.Text = "YOUTUBE"
+                    youtubeSocialBtn.BackgroundColor3 = Theme.DarkGray
+                    youtubeSocialBtn.TextColor3 = Theme.White
+                end
+            end)
+        end
+    end)
+
+    -- 3. Bottom Two Feature Cards (matching white-circled 2-card bottom row)
+    local cardsRow = Instance.new("Frame")
+    cardsRow.Size = UDim2.new(1, -8, 0, 84)
+    cardsRow.Position = UDim2.new(0, 4, 0, 140)
+    cardsRow.BackgroundTransparency = 1
+    cardsRow.Parent = HomeTab
+
+    local function createHomeFeatureCard(xScale, xOffset, titleText, descText, targetTabName)
+        local cardBtn = Instance.new("TextButton")
+        cardBtn.Size = UDim2.new(0.49, -2, 1, 0)
+        cardBtn.Position = UDim2.new(xScale, xOffset, 0, 0)
+        cardBtn.BackgroundColor3 = Theme.DarkGray
+        cardBtn.Text = ""
+        cardBtn.AutoButtonColor = false
+        cardBtn.Parent = cardsRow
+        Instance.new("UICorner", cardBtn).CornerRadius = UDim.new(0, 10)
+        addWhiteBoxStroke(cardBtn, 1, 0.25)
+
+        local cTitle = Instance.new("TextLabel")
+        cTitle.Size = UDim2.new(1, -16, 0, 22)
+        cTitle.Position = UDim2.new(0, 10, 0, 8)
+        cTitle.BackgroundTransparency = 1
+        cTitle.Text = titleText
+        cTitle.TextColor3 = Theme.White
+        cTitle.Font = BODY_FONT
+        cTitle.TextSize = 12
+        cTitle.TextXAlignment = Enum.TextXAlignment.Left
+        cTitle.Parent = cardBtn
+
+        local cDesc = Instance.new("TextLabel")
+        cDesc.Size = UDim2.new(1, -16, 0, 44)
+        cDesc.Position = UDim2.new(0, 10, 0, 32)
+        cDesc.BackgroundTransparency = 1
+        cDesc.Text = descText
+        cDesc.TextColor3 = Theme.SubText
+        cDesc.Font = Enum.Font.Gotham
+        cDesc.TextSize = 9.5
+        cDesc.TextWrapped = true
+        cDesc.TextXAlignment = Enum.TextXAlignment.Left
+        cDesc.TextYAlignment = Enum.TextYAlignment.Top
+        cDesc.Parent = cardBtn
+
+        cardBtn.MouseButton1Click:Connect(function()
+            TweenService:Create(cardBtn, TweenInfo.new(0.1), { BackgroundColor3 = Theme.MidGray }):Play()
+            task.delay(0.12, function()
+                if cardBtn.Parent then
+                    TweenService:Create(cardBtn, TweenInfo.new(0.15), { BackgroundColor3 = Theme.DarkGray }):Play()
+                end
+            end)
+            SelectTab(targetTabName)
+        end)
+    end
+
+    createHomeFeatureCard(
+        0, 0,
+        "Move & TP",
+        "Saved locations, instant teleport, walk & tween navigation",
+        "TP"
+    )
+
+    createHomeFeatureCard(
+        0.51, 2,
+        "Combat & ESP",
+        "Auto aim lock, walk speed, flight, noclip & player ESP",
+        "Cheats"
+    )
 
     -- ============================================================
     -- TP TAB
