@@ -144,18 +144,18 @@ end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- CUSTOM ASSETS & MONOCHROME THEME
+-- CUSTOM ASSETS, SONGS & MONOCHROME THEME
 -- ============================================================
--- Put a custom image file inside your executor workspace (e.g. "brineland_banner.png")
--- OR set CustomBannerId to a Roblox asset ID like "rbxassetid://YOUR_ASSET_ID"
+-- Put a custom image in executor workspace (e.g. "brineland_banner.png")
+-- OR set CUSTOM_BANNER_ID to "rbxassetid://YOUR_ASSET_ID"
 local CUSTOM_BANNER_FILE = "brineland_banner.png"
-local CUSTOM_BANNER_ID   = "" -- Optional fallback: "rbxassetid://1234567890"
+local CUSTOM_BANNER_ID   = ""
 
 local SONG_PLAYLIST = {
-    { Name = "Track 01 - Night Drive",    SoundId = "rbxassetid://1843404009" },
-    { Name = "Track 02 - Dark Synth",     SoundId = "rbxassetid://1837849285" },
-    { Name = "Track 03 - Lo-Fi Focus",    SoundId = "rbxassetid://9043887091" },
-    { Name = "Track 04 - Arcade Pulse",   SoundId = "rbxassetid://1846078556" },
+    { Name = "Track 01 - Night Drive",  SoundId = "rbxassetid://1843404009" },
+    { Name = "Track 02 - Dark Synth",   SoundId = "rbxassetid://1837849285" },
+    { Name = "Track 03 - Lo-Fi Focus",  SoundId = "rbxassetid://9043887091" },
+    { Name = "Track 04 - Arcade Pulse", SoundId = "rbxassetid://1846078556" },
 }
 
 local Theme = {
@@ -222,8 +222,8 @@ local function VerifyAndLoadHub()
     ScreenGui.Parent = PlayerGui
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.fromOffset(370, 260)
-    MainFrame.Position = UDim2.fromOffset(18, 56)
+    MainFrame.Size = UDim2.fromOffset(350, 235)
+    MainFrame.Position = UDim2.fromOffset(16, 48)
     MainFrame.BackgroundColor3 = Theme.Black
     MainFrame.BackgroundTransparency = 0.06
     MainFrame.BorderSizePixel = 0
@@ -233,78 +233,78 @@ local function VerifyAndLoadHub()
     addWhiteBoxStroke(MainFrame, 1.5, 0)
 
     local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, 0, 0, 44)
+    Title.Size = UDim2.new(1, 0, 0, 40)
     Title.BackgroundTransparency = 1
     Title.Text = "Brineland"
     Title.TextColor3 = Theme.White
-    Title.TextSize = 22
+    Title.TextSize = 20
     Title.Font = FANCY_FONT
     Title.Parent = MainFrame
 
     local headerLine = Instance.new("Frame")
-    headerLine.Size = UDim2.new(1, -20, 0, 1)
-    headerLine.Position = UDim2.new(0, 10, 0, 44)
+    headerLine.Size = UDim2.new(1, -16, 0, 1)
+    headerLine.Position = UDim2.new(0, 8, 0, 40)
     headerLine.BackgroundColor3 = Theme.White
     headerLine.BorderSizePixel = 0
     headerLine.Parent = MainFrame
 
     local KeyInput = Instance.new("TextBox")
-    KeyInput.Size = UDim2.new(0.9, 0, 0, 36)
-    KeyInput.Position = UDim2.new(0.05, 0, 0, 54)
+    KeyInput.Size = UDim2.new(0.9, 0, 0, 34)
+    KeyInput.Position = UDim2.new(0.05, 0, 0, 48)
     KeyInput.PlaceholderText = "Paste your key here..."
     KeyInput.PlaceholderColor3 = Theme.SubText
     KeyInput.Text = ""
     KeyInput.TextColor3 = Theme.White
     KeyInput.BackgroundColor3 = Theme.DarkGray
-    KeyInput.TextSize = 12
+    KeyInput.TextSize = 11
     KeyInput.Font = BODY_FONT
     KeyInput.Parent = MainFrame
     Instance.new("UICorner", KeyInput).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(KeyInput, 1, 0.25)
 
     local WorkInkBtn = Instance.new("TextButton")
-    WorkInkBtn.Size = UDim2.new(0.9, 0, 0, 34)
-    WorkInkBtn.Position = UDim2.new(0.05, 0, 0, 98)
+    WorkInkBtn.Size = UDim2.new(0.9, 0, 0, 32)
+    WorkInkBtn.Position = UDim2.new(0.05, 0, 0, 88)
     WorkInkBtn.BackgroundColor3 = Theme.MidGray
     WorkInkBtn.Text = "GET KEY (WORK.INK)"
     WorkInkBtn.TextColor3 = Theme.White
-    WorkInkBtn.TextSize = 11
+    WorkInkBtn.TextSize = 10.5
     WorkInkBtn.Font = BODY_FONT
     WorkInkBtn.Parent = MainFrame
     Instance.new("UICorner", WorkInkBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(WorkInkBtn, 1, 0.2)
 
     local SubmitBtn = Instance.new("TextButton")
-    SubmitBtn.Size = UDim2.new(0.43, 0, 0, 36)
-    SubmitBtn.Position = UDim2.new(0.05, 0, 0, 142)
+    SubmitBtn.Size = UDim2.new(0.43, 0, 0, 34)
+    SubmitBtn.Position = UDim2.new(0.05, 0, 0, 128)
     SubmitBtn.BackgroundColor3 = Theme.DarkGray
     SubmitBtn.Text = "VERIFY KEY"
     SubmitBtn.TextColor3 = Theme.White
-    SubmitBtn.TextSize = 12
+    SubmitBtn.TextSize = 11
     SubmitBtn.Font = BODY_FONT
     SubmitBtn.Parent = MainFrame
     Instance.new("UICorner", SubmitBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(SubmitBtn, 1, 0.2)
 
     local DiscordBtn = Instance.new("TextButton")
-    DiscordBtn.Size = UDim2.new(0.43, 0, 0, 36)
-    DiscordBtn.Position = UDim2.new(0.52, 0, 0, 142)
+    DiscordBtn.Size = UDim2.new(0.43, 0, 0, 34)
+    DiscordBtn.Position = UDim2.new(0.52, 0, 0, 128)
     DiscordBtn.BackgroundColor3 = Theme.DarkGray
     DiscordBtn.Text = "COPY DISCORD"
     DiscordBtn.TextColor3 = Theme.White
-    DiscordBtn.TextSize = 11
+    DiscordBtn.TextSize = 10.5
     DiscordBtn.Font = BODY_FONT
     DiscordBtn.Parent = MainFrame
     Instance.new("UICorner", DiscordBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(DiscordBtn, 1, 0.2)
 
     local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, -16, 0, 56)
-    StatusLabel.Position = UDim2.new(0, 8, 0, 188)
+    StatusLabel.Size = UDim2.new(1, -16, 0, 48)
+    StatusLabel.Position = UDim2.new(0, 8, 0, 170)
     StatusLabel.BackgroundTransparency = 1
     StatusLabel.Text = "Click Get Key to complete Work.ink verification!"
     StatusLabel.TextColor3 = Theme.SubText
-    StatusLabel.TextSize = 11
+    StatusLabel.TextSize = 10.5
     StatusLabel.Font = BODY_FONT
     StatusLabel.TextWrapped = true
     StatusLabel.Parent = MainFrame
@@ -351,7 +351,7 @@ local function VerifyAndLoadHub()
             end
             task.wait(0.45)
             local outTween = TweenService:Create(MainFrame, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
-                Size = UDim2.fromOffset(370, 0),
+                Size = UDim2.fromOffset(350, 0),
                 BackgroundTransparency = 1
             })
             outTween:Play()
@@ -371,7 +371,7 @@ end
 VerifyAndLoadHub()
 
 -- ============================================================
--- UNIVERSAL HUB (DEDICATED HOME TAB + SONGS + 6 FEATURE TABS)
+-- UNIVERSAL HUB (COMPACT LEFT CORNER + NO HOME TAB + SONGS)
 -- ============================================================
 local function RunUniversalScript()
     local UserInputService = game:GetService("UserInputService")
@@ -395,7 +395,6 @@ local function RunUniversalScript()
         return c
     end
 
-    -- Audio / Songs Controller
     local musicSound = Instance.new("Sound")
     musicSound.Name = "BrinelandMusicPlayer"
     musicSound.Looped = true
@@ -693,12 +692,13 @@ local function RunUniversalScript()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = PlayerGui
 
-    local HUB_WIDTH = 370
-    local HUB_HEIGHT = 455
+    -- Compact size so it is not overly tall
+    local HUB_WIDTH = 350
+    local HUB_HEIGHT = 315
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Size = UDim2.fromOffset(HUB_WIDTH, 0)
-    MainFrame.Position = UDim2.fromOffset(18, 56)
+    MainFrame.Position = UDim2.fromOffset(16, 48)
     MainFrame.BackgroundColor3 = Theme.Black
     MainFrame.BackgroundTransparency = 0.06
     MainFrame.BorderSizePixel = 0
@@ -708,12 +708,12 @@ local function RunUniversalScript()
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
     addWhiteBoxStroke(MainFrame, 1.5, 0)
 
-    TweenService:Create(MainFrame, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+    TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
         Size = UDim2.fromOffset(HUB_WIDTH, HUB_HEIGHT)
     }):Play()
 
     local TopBar = Instance.new("Frame")
-    TopBar.Size = UDim2.new(1, 0, 0, 44)
+    TopBar.Size = UDim2.new(1, 0, 0, 40)
     TopBar.BackgroundColor3 = Theme.DarkGray
     TopBar.BackgroundTransparency = 0.1
     TopBar.BorderSizePixel = 0
@@ -721,50 +721,50 @@ local function RunUniversalScript()
     Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 12)
 
     local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -134, 1, 0)
-    Title.Position = UDim2.new(0, 14, 0, 0)
+    Title.Size = UDim2.new(1, -130, 1, 0)
+    Title.Position = UDim2.new(0, 12, 0, 0)
     Title.BackgroundTransparency = 1
     Title.Text = "Brineland"
     Title.TextColor3 = Theme.White
     Title.Font = FANCY_FONT
-    Title.TextSize = 20
+    Title.TextSize = 19
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TopBar
 
-    -- Oval Home button (opens dedicated Home tab)
+    -- Oval Home button (jumps straight to Info view, NO separate Home tab)
     local HomeOvalBtn = Instance.new("TextButton")
-    HomeOvalBtn.Size = UDim2.fromOffset(54, 26)
-    HomeOvalBtn.Position = UDim2.new(1, -126, 0.5, -13)
+    HomeOvalBtn.Size = UDim2.fromOffset(50, 24)
+    HomeOvalBtn.Position = UDim2.new(1, -120, 0.5, -12)
     HomeOvalBtn.BackgroundColor3 = Theme.White
     HomeOvalBtn.Text = "Home"
     HomeOvalBtn.TextColor3 = Theme.Black
     HomeOvalBtn.Font = BODY_FONT
-    HomeOvalBtn.TextSize = 10
+    HomeOvalBtn.TextSize = 9.5
     HomeOvalBtn.Parent = TopBar
     Instance.new("UICorner", HomeOvalBtn).CornerRadius = UDim.new(1, 0)
 
     -- Circular Arrow button
     local ArrowCircleBtn = Instance.new("TextButton")
-    ArrowCircleBtn.Size = UDim2.fromOffset(28, 28)
-    ArrowCircleBtn.Position = UDim2.new(1, -66, 0.5, -14)
+    ArrowCircleBtn.Size = UDim2.fromOffset(26, 26)
+    ArrowCircleBtn.Position = UDim2.new(1, -62, 0.5, -13)
     ArrowCircleBtn.BackgroundColor3 = Theme.MidGray
     ArrowCircleBtn.Text = "▼"
     ArrowCircleBtn.TextColor3 = Theme.White
     ArrowCircleBtn.Font = BODY_FONT
-    ArrowCircleBtn.TextSize = 11
+    ArrowCircleBtn.TextSize = 10
     ArrowCircleBtn.Parent = TopBar
     Instance.new("UICorner", ArrowCircleBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(ArrowCircleBtn, 1, 0.2)
 
     -- Circular Close button
     local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.fromOffset(28, 28)
-    CloseBtn.Position = UDim2.new(1, -34, 0.5, -14)
+    CloseBtn.Size = UDim2.fromOffset(26, 26)
+    CloseBtn.Position = UDim2.new(1, -32, 0.5, -13)
     CloseBtn.BackgroundColor3 = Theme.MidGray
     CloseBtn.Text = "X"
     CloseBtn.TextColor3 = Theme.White
     CloseBtn.Font = BODY_FONT
-    CloseBtn.TextSize = 12
+    CloseBtn.TextSize = 11
     CloseBtn.Parent = TopBar
     Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(CloseBtn, 1, 0.2)
@@ -783,25 +783,24 @@ local function RunUniversalScript()
     end)
 
     local topDivider = Instance.new("Frame")
-    topDivider.Size = UDim2.new(1, -16, 0, 1)
-    topDivider.Position = UDim2.new(0, 8, 0, 44)
+    topDivider.Size = UDim2.new(1, -14, 0, 1)
+    topDivider.Position = UDim2.new(0, 7, 0, 40)
     topDivider.BackgroundColor3 = Theme.White
     topDivider.BorderSizePixel = 0
     topDivider.Parent = MainFrame
 
-    -- Scrollable TabBar so Home, Info, TP, Player, Cheats, Visuals, Songs, Key all fit cleanly
     local TabBar = Instance.new("ScrollingFrame")
-    TabBar.Size = UDim2.new(1, -16, 0, 32)
-    TabBar.Position = UDim2.new(0, 8, 0, 49)
+    TabBar.Size = UDim2.new(1, -14, 0, 28)
+    TabBar.Position = UDim2.new(0, 7, 0, 44)
     TabBar.BackgroundTransparency = 1
     TabBar.ScrollBarThickness = 2
     TabBar.ScrollBarImageColor3 = Theme.White
-    TabBar.CanvasSize = UDim2.new(0, 560, 0, 0)
+    TabBar.CanvasSize = UDim2.new(0, 470, 0, 0)
     TabBar.Parent = MainFrame
 
     local TabLayout = Instance.new("UIListLayout")
     TabLayout.FillDirection = Enum.FillDirection.Horizontal
-    TabLayout.Padding = UDim.new(0, 5)
+    TabLayout.Padding = UDim.new(0, 4)
     TabLayout.Parent = TabBar
 
     TabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -809,14 +808,14 @@ local function RunUniversalScript()
     end)
 
     local tabDivider = Instance.new("Frame")
-    tabDivider.Size = UDim2.new(1, -16, 0, 1)
-    tabDivider.Position = UDim2.new(0, 8, 0, 84)
+    tabDivider.Size = UDim2.new(1, -14, 0, 1)
+    tabDivider.Position = UDim2.new(0, 7, 0, 75)
     tabDivider.BackgroundColor3 = Theme.White
     tabDivider.BorderSizePixel = 0
     tabDivider.Parent = MainFrame
 
     local TabFrames = {}
-    local activeTabName = "Home"
+    local activeTabName = "Info"
 
     local function SelectTab(tabName)
         activeTabName = tabName
@@ -832,19 +831,19 @@ local function RunUniversalScript()
 
     local function CreateTab(tabName, widthPx)
         local tabBtn = Instance.new("TextButton")
-        tabBtn.Size = UDim2.fromOffset(widthPx or 62, 26)
+        tabBtn.Size = UDim2.fromOffset(widthPx or 56, 23)
         tabBtn.BackgroundColor3 = Theme.DarkGray
         tabBtn.Text = tabName
         tabBtn.TextColor3 = Theme.SubText
         tabBtn.Font = BODY_FONT
-        tabBtn.TextSize = 9
+        tabBtn.TextSize = 8.5
         tabBtn.Parent = TabBar
         Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(1, 0)
         addWhiteBoxStroke(tabBtn, 1, 0.35)
 
         local container = Instance.new("ScrollingFrame")
-        container.Size = UDim2.new(1, -16, 1, -94)
-        container.Position = UDim2.new(0, 8, 0, 90)
+        container.Size = UDim2.new(1, -14, 1, -83)
+        container.Position = UDim2.new(0, 7, 0, 80)
         container.BackgroundTransparency = 1
         container.ScrollBarThickness = 3
         container.ScrollBarImageColor3 = Theme.White
@@ -852,11 +851,11 @@ local function RunUniversalScript()
         container.Parent = MainFrame
 
         local listLayout = Instance.new("UIListLayout")
-        listLayout.Padding = UDim.new(0, 7)
+        listLayout.Padding = UDim.new(0, 6)
         listLayout.Parent = container
 
         listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            container.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 14)
+            container.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 12)
         end)
 
         TabFrames[tabName] = { Button = tabBtn, Container = container }
@@ -867,18 +866,18 @@ local function RunUniversalScript()
         return container
     end
 
-    -- DEDICATED HOME TAB + ALL FEATURE TABS + SONGS TAB
-    local HomeTab      = CreateTab("Home", 60)
-    local InfoTab      = CreateTab("Info", 54)
-    local TeleportsTab = CreateTab("TP", 46)
-    local PlayersTab   = CreateTab("Player", 62)
-    local CheatsTab    = CreateTab("Cheats", 62)
-    local VisualsTab   = CreateTab("Visuals", 68)
-    local SongsTab     = CreateTab("Songs", 60)
-    local KeyTab       = CreateTab("Key", 48)
+    -- TABS: Info, TP, Player, Cheats, Visuals, Songs, Key (No Home tab!)
+    local InfoTab      = CreateTab("Info", 50)
+    local TeleportsTab = CreateTab("TP", 42)
+    local PlayersTab   = CreateTab("Player", 56)
+    local CheatsTab    = CreateTab("Cheats", 56)
+    local VisualsTab   = CreateTab("Visuals", 62)
+    local SongsTab     = CreateTab("Songs", 56)
+    local KeyTab       = CreateTab("Key", 44)
 
+    SelectTab("Info")
     HomeOvalBtn.MouseButton1Click:Connect(function()
-        SelectTab("Home")
+        SelectTab("Info")
     end)
 
     local isCollapsed = false
@@ -889,12 +888,12 @@ local function RunUniversalScript()
             TabBar.Visible = false
             topDivider.Visible = false
             tabDivider.Visible = false
-            TweenService:Create(MainFrame, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Size = UDim2.fromOffset(HUB_WIDTH, 44)
+            TweenService:Create(MainFrame, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(HUB_WIDTH, 40)
             }):Play()
             TweenService:Create(ArrowCircleBtn, TweenInfo.new(0.2), { Rotation = 180 }):Play()
         else
-            TweenService:Create(MainFrame, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            TweenService:Create(MainFrame, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 Size = UDim2.fromOffset(HUB_WIDTH, HUB_HEIGHT)
             }):Play()
             TweenService:Create(ArrowCircleBtn, TweenInfo.new(0.2), { Rotation = 0 }):Play()
@@ -924,7 +923,7 @@ local function RunUniversalScript()
 
     local function CreateButton(parentContainer, text, callback)
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -2, 0, 38)
+        frame.Size = UDim2.new(1, -2, 0, 34)
         frame.BackgroundColor3 = Theme.DarkGray
         frame.Parent = parentContainer
         Instance.new("UICorner", frame).CornerRadius = UDim.new(1, 0)
@@ -936,7 +935,7 @@ local function RunUniversalScript()
         btn.Text = text
         btn.TextColor3 = Theme.White
         btn.Font = BODY_FONT
-        btn.TextSize = 11
+        btn.TextSize = 10.5
         btn.Parent = frame
 
         btn.MouseButton1Click:Connect(function()
@@ -952,34 +951,34 @@ local function RunUniversalScript()
 
     local function CreateToggle(parentContainer, text, callback)
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -2, 0, 40)
+        frame.Size = UDim2.new(1, -2, 0, 36)
         frame.BackgroundColor3 = Theme.DarkGray
         frame.Parent = parentContainer
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
         addWhiteBoxStroke(frame, 1, 0.25)
 
         local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -60, 1, 0)
-        lbl.Position = UDim2.new(0, 12, 0, 0)
+        lbl.Size = UDim2.new(1, -56, 1, 0)
+        lbl.Position = UDim2.new(0, 10, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.Text = text
         lbl.TextColor3 = Theme.White
         lbl.Font = BODY_FONT
-        lbl.TextSize = 11
+        lbl.TextSize = 10.5
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.Parent = frame
 
         local toggleBg = Instance.new("Frame")
-        toggleBg.Size = UDim2.fromOffset(42, 22)
-        toggleBg.Position = UDim2.new(1, -50, 0.5, -11)
+        toggleBg.Size = UDim2.fromOffset(38, 20)
+        toggleBg.Position = UDim2.new(1, -46, 0.5, -10)
         toggleBg.BackgroundColor3 = Theme.MidGray
         toggleBg.Parent = frame
         Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
         addWhiteBoxStroke(toggleBg, 1, 0.3)
 
         local knob = Instance.new("Frame")
-        knob.Size = UDim2.fromOffset(18, 18)
-        knob.Position = UDim2.new(0, 2, 0.5, -9)
+        knob.Size = UDim2.fromOffset(16, 16)
+        knob.Position = UDim2.new(0, 2, 0.5, -8)
         knob.BackgroundColor3 = Theme.White
         knob.Parent = toggleBg
         Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
@@ -994,7 +993,7 @@ local function RunUniversalScript()
         btn.MouseButton1Click:Connect(function()
             active = not active
             TweenService:Create(knob, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Position = active and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9),
+                Position = active and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
                 BackgroundColor3 = active and Theme.Black or Theme.White
             }):Play()
             TweenService:Create(toggleBg, TweenInfo.new(0.2), {
@@ -1006,26 +1005,26 @@ local function RunUniversalScript()
 
     local function CreateSlider(parentContainer, text, minVal, maxVal, defaultVal, showNumbers, callback)
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -2, 0, 48)
+        frame.Size = UDim2.new(1, -2, 0, 42)
         frame.BackgroundColor3 = Theme.DarkGray
         frame.Parent = parentContainer
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
         addWhiteBoxStroke(frame, 1, 0.25)
 
         local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -20, 0, 20)
-        lbl.Position = UDim2.new(0, 12, 0, 4)
+        lbl.Size = UDim2.new(1, -16, 0, 18)
+        lbl.Position = UDim2.new(0, 10, 0, 3)
         lbl.BackgroundTransparency = 1
         lbl.Text = showNumbers and (text .. ": " .. tostring(defaultVal)) or text
         lbl.TextColor3 = Theme.White
         lbl.Font = BODY_FONT
-        lbl.TextSize = 11
+        lbl.TextSize = 10
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.Parent = frame
 
         local track = Instance.new("Frame")
-        track.Size = UDim2.new(1, -24, 0, 8)
-        track.Position = UDim2.new(0, 12, 0, 29)
+        track.Size = UDim2.new(1, -20, 0, 7)
+        track.Position = UDim2.new(0, 10, 0, 25)
         track.BackgroundColor3 = Theme.MidGray
         track.Parent = frame
         Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
@@ -1068,152 +1067,6 @@ local function RunUniversalScript()
     end
 
     -- ============================================================
-    -- DEDICATED HOME TAB (BANNER + HUB SUMMARY + FEATURE CARDS)
-    -- ============================================================
-    local bannerCard = Instance.new("Frame")
-    bannerCard.Size = UDim2.new(1, -2, 0, 112)
-    bannerCard.BackgroundColor3 = Theme.DarkGray
-    bannerCard.ClipsDescendants = true
-    bannerCard.Parent = HomeTab
-    Instance.new("UICorner", bannerCard).CornerRadius = UDim.new(0, 10)
-    addWhiteBoxStroke(bannerCard, 1.25, 0.1)
-
-    local bannerImg = Instance.new("ImageLabel")
-    bannerImg.Size = UDim2.new(1, 0, 1, 0)
-    bannerImg.BackgroundTransparency = 1
-    bannerImg.Image = resolveCustomBannerImage()
-    bannerImg.ImageTransparency = 0.25
-    bannerImg.ScaleType = Enum.ScaleType.Crop
-    bannerImg.Parent = bannerCard
-
-    local bannerOverlay = Instance.new("Frame")
-    bannerOverlay.Size = UDim2.new(1, 0, 1, 0)
-    bannerOverlay.BackgroundColor3 = Theme.Black
-    bannerOverlay.BackgroundTransparency = (bannerImg.Image ~= "") and 0.45 or 0.15
-    bannerOverlay.BorderSizePixel = 0
-    bannerOverlay.Parent = bannerCard
-
-    local welcomeLbl = Instance.new("TextLabel")
-    welcomeLbl.Size = UDim2.new(1, -20, 0, 24)
-    welcomeLbl.Position = UDim2.new(0, 12, 0, 10)
-    welcomeLbl.BackgroundTransparency = 1
-    welcomeLbl.Text = "BRINELAND HUB"
-    welcomeLbl.TextColor3 = Theme.White
-    welcomeLbl.Font = FANCY_FONT
-    welcomeLbl.TextSize = 18
-    welcomeLbl.TextXAlignment = Enum.TextXAlignment.Left
-    welcomeLbl.Parent = bannerCard
-
-    local descLbl = Instance.new("TextLabel")
-    descLbl.Size = UDim2.new(1, -20, 0, 62)
-    descLbl.Position = UDim2.new(0, 12, 0, 36)
-    descLbl.BackgroundTransparency = 1
-    descLbl.Text = "• Custom monochrome hub with TP, Player, Cheats, Visuals, Songs & Keybinds\n• Live server stats, 3D avatar preview & console in Info\n• Drop your custom image in workspace/" .. CUSTOM_BANNER_FILE .. " or set CUSTOM_BANNER_ID"
-    descLbl.TextColor3 = Theme.SubText
-    descLbl.Font = Enum.Font.Gotham
-    descLbl.TextSize = 9.5
-    descLbl.TextXAlignment = Enum.TextXAlignment.Left
-    descLbl.TextYAlignment = Enum.TextYAlignment.Top
-    descLbl.TextWrapped = true
-    descLbl.Parent = bannerCard
-
-    -- Quick Action Row on Home
-    local homeActionsRow = Instance.new("Frame")
-    homeActionsRow.Size = UDim2.new(1, -2, 0, 34)
-    homeActionsRow.BackgroundTransparency = 1
-    homeActionsRow.Parent = HomeTab
-
-    local copyDiscHomeBtn = Instance.new("TextButton")
-    copyDiscHomeBtn.Size = UDim2.new(0.49, -2, 1, 0)
-    copyDiscHomeBtn.Position = UDim2.new(0, 0, 0, 0)
-    copyDiscHomeBtn.BackgroundColor3 = Theme.White
-    copyDiscHomeBtn.Text = "COPY DISCORD"
-    copyDiscHomeBtn.TextColor3 = Theme.Black
-    copyDiscHomeBtn.Font = BODY_FONT
-    copyDiscHomeBtn.TextSize = 10
-    copyDiscHomeBtn.Parent = homeActionsRow
-    Instance.new("UICorner", copyDiscHomeBtn).CornerRadius = UDim.new(1, 0)
-
-    local openInfoHomeBtn = Instance.new("TextButton")
-    openInfoHomeBtn.Size = UDim2.new(0.49, -2, 1, 0)
-    openInfoHomeBtn.Position = UDim2.new(0.51, 2, 0, 0)
-    openInfoHomeBtn.BackgroundColor3 = Theme.DarkGray
-    openInfoHomeBtn.Text = "OPEN INFO & LOGS"
-    openInfoHomeBtn.TextColor3 = Theme.White
-    openInfoHomeBtn.Font = BODY_FONT
-    openInfoHomeBtn.TextSize = 10
-    openInfoHomeBtn.Parent = homeActionsRow
-    Instance.new("UICorner", openInfoHomeBtn).CornerRadius = UDim.new(1, 0)
-    addWhiteBoxStroke(openInfoHomeBtn, 1, 0.25)
-
-    copyDiscHomeBtn.MouseButton1Click:Connect(function()
-        if fSetClipboard then
-            pcall(fSetClipboard, DISCORD_INVITE)
-            copyDiscHomeBtn.Text = "COPIED!"
-            task.delay(1.2, function()
-                if copyDiscHomeBtn.Parent then copyDiscHomeBtn.Text = "COPY DISCORD" end
-            end)
-        end
-    end)
-
-    openInfoHomeBtn.MouseButton1Click:Connect(function()
-        SelectTab("Info")
-    end)
-
-    -- 3-Card Feature Overview Grid (inspired by Nexo's bottom cards, styled in B&W/Gray)
-    local overviewGrid = Instance.new("Frame")
-    overviewGrid.Size = UDim2.new(1, -2, 0, 92)
-    overviewGrid.BackgroundTransparency = 1
-    overviewGrid.Parent = HomeTab
-
-    local ovLayout = Instance.new("UIListLayout")
-    ovLayout.FillDirection = Enum.FillDirection.Horizontal
-    ovLayout.Padding = UDim.new(0, 6)
-    ovLayout.Parent = overviewGrid
-
-    local function createOverviewCard(titleText, bodyText, jumpTab)
-        local card = Instance.new("TextButton")
-        card.Size = UDim2.new(0.333, -4, 1, 0)
-        card.BackgroundColor3 = Theme.DarkGray
-        card.Text = ""
-        card.Parent = overviewGrid
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
-        addWhiteBoxStroke(card, 1, 0.25)
-
-        local cTitle = Instance.new("TextLabel")
-        cTitle.Size = UDim2.new(1, -10, 0, 22)
-        cTitle.Position = UDim2.new(0, 5, 0, 6)
-        cTitle.BackgroundTransparency = 1
-        cTitle.Text = titleText
-        cTitle.TextColor3 = Theme.White
-        cTitle.Font = BODY_FONT
-        cTitle.TextSize = 10.5
-        cTitle.TextXAlignment = Enum.TextXAlignment.Left
-        cTitle.Parent = card
-
-        local cBody = Instance.new("TextLabel")
-        cBody.Size = UDim2.new(1, -10, 1, -30)
-        cBody.Position = UDim2.new(0, 5, 0, 28)
-        cBody.BackgroundTransparency = 1
-        cBody.Text = bodyText
-        cBody.TextColor3 = Theme.SubText
-        cBody.Font = Enum.Font.Gotham
-        cBody.TextSize = 8.5
-        cBody.TextXAlignment = Enum.TextXAlignment.Left
-        cBody.TextYAlignment = Enum.TextYAlignment.Top
-        cBody.TextWrapped = true
-        cBody.Parent = card
-
-        card.MouseButton1Click:Connect(function()
-            SelectTab(jumpTab)
-        end)
-    end
-
-    createOverviewCard("Move & TP", "Saved spots, player warp, walk, tween, fly & noclip.", "TP")
-    createOverviewCard("Combat & ESP", "Auto aim lock, walk speed, fast interact & ESP.", "Cheats")
-    createOverviewCard("Media & Binds", "Built-in songs player, hotkeys & server logs.", "Songs")
-
-    -- ============================================================
     -- TP TAB
     -- ============================================================
     local customTpCount = 0
@@ -1227,31 +1080,31 @@ local function RunUniversalScript()
         local posName = string.format("TP #%d (%.0f, %.0f, %.0f)", customTpCount, savedPos.Position.X, savedPos.Position.Y, savedPos.Position.Z)
 
         local card = Instance.new("Frame")
-        card.Size = UDim2.new(1, -2, 0, 80)
+        card.Size = UDim2.new(1, -2, 0, 72)
         card.BackgroundColor3 = Theme.DarkGray
         card.Parent = TeleportsTab
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
         addWhiteBoxStroke(card, 1, 0.25)
 
         local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, -35, 0, 26)
-        label.Position = UDim2.new(0, 10, 0, 4)
+        label.Size = UDim2.new(1, -32, 0, 24)
+        label.Position = UDim2.new(0, 8, 0, 3)
         label.BackgroundTransparency = 1
         label.Text = posName
         label.TextColor3 = Theme.White
         label.Font = BODY_FONT
-        label.TextSize = 10
+        label.TextSize = 9.5
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = card
 
         local deleteBtn = Instance.new("TextButton")
-        deleteBtn.Size = UDim2.fromOffset(24, 24)
-        deleteBtn.Position = UDim2.new(1, -28, 0, 4)
+        deleteBtn.Size = UDim2.fromOffset(22, 22)
+        deleteBtn.Position = UDim2.new(1, -26, 0, 4)
         deleteBtn.BackgroundColor3 = Theme.MidGray
         deleteBtn.Text = "X"
         deleteBtn.TextColor3 = Theme.White
         deleteBtn.Font = BODY_FONT
-        deleteBtn.TextSize = 10
+        deleteBtn.TextSize = 9.5
         deleteBtn.Parent = card
         Instance.new("UICorner", deleteBtn).CornerRadius = UDim.new(1, 0)
         addWhiteBoxStroke(deleteBtn, 1, 0.25)
@@ -1259,13 +1112,13 @@ local function RunUniversalScript()
 
         local function makeActionPill(labelText, xScale, xOffset, cb)
             local b = Instance.new("TextButton")
-            b.Size = UDim2.new(0.32, -4, 0, 34)
-            b.Position = UDim2.new(xScale, xOffset, 0, 38)
+            b.Size = UDim2.new(0.32, -4, 0, 30)
+            b.Position = UDim2.new(xScale, xOffset, 0, 34)
             b.BackgroundColor3 = Theme.MidGray
             b.Text = labelText
             b.TextColor3 = Theme.White
             b.Font = BODY_FONT
-            b.TextSize = 11
+            b.TextSize = 10
             b.Parent = card
             Instance.new("UICorner", b).CornerRadius = UDim.new(1, 0)
             addWhiteBoxStroke(b, 1, 0.3)
@@ -1283,23 +1136,23 @@ local function RunUniversalScript()
     local selectedTarget = nil
 
     local selectorBtn = Instance.new("TextButton")
-    selectorBtn.Size = UDim2.new(1, -2, 0, 38)
+    selectorBtn.Size = UDim2.new(1, -2, 0, 34)
     selectorBtn.BackgroundColor3 = Theme.DarkGray
     selectorBtn.Text = "Selected Player: None (Click to choose)"
     selectorBtn.TextColor3 = Theme.White
     selectorBtn.Font = BODY_FONT
-    selectorBtn.TextSize = 11
+    selectorBtn.TextSize = 10
     selectorBtn.Parent = PlayersTab
     Instance.new("UICorner", selectorBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(selectorBtn, 1, 0.25)
 
     local dropdownContainer = Instance.new("ScrollingFrame")
-    dropdownContainer.Size = UDim2.new(1, -2, 0, 140)
+    dropdownContainer.Size = UDim2.new(1, -2, 0, 110)
     dropdownContainer.BackgroundColor3 = Theme.Black
     dropdownContainer.ScrollBarThickness = 3
     dropdownContainer.Visible = false
     dropdownContainer.Parent = PlayersTab
-    Instance.new("UICorner", dropdownContainer).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", dropdownContainer).CornerRadius = UDim.new(0, 8)
     addWhiteBoxStroke(dropdownContainer, 1, 0.25)
 
     local dropLayout = Instance.new("UIListLayout")
@@ -1318,12 +1171,12 @@ local function RunUniversalScript()
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr ~= LocalPlayer then
                 local pBtn = Instance.new("TextButton")
-                pBtn.Size = UDim2.new(1, -6, 0, 32)
+                pBtn.Size = UDim2.new(1, -6, 0, 28)
                 pBtn.BackgroundColor3 = Theme.DarkGray
                 pBtn.Text = plr.DisplayName .. " (@" .. plr.Name .. ")"
                 pBtn.TextColor3 = Theme.White
                 pBtn.Font = BODY_FONT
-                pBtn.TextSize = 10
+                pBtn.TextSize = 9.5
                 pBtn.Parent = dropdownContainer
                 Instance.new("UICorner", pBtn).CornerRadius = UDim.new(1, 0)
 
@@ -1346,7 +1199,7 @@ local function RunUniversalScript()
     end)
 
     local actionCard = Instance.new("Frame")
-    actionCard.Size = UDim2.new(1, -2, 0, 48)
+    actionCard.Size = UDim2.new(1, -2, 0, 40)
     actionCard.BackgroundColor3 = Theme.DarkGray
     actionCard.Parent = PlayersTab
     Instance.new("UICorner", actionCard).CornerRadius = UDim.new(1, 0)
@@ -1360,7 +1213,7 @@ local function RunUniversalScript()
         b.Text = labelText
         b.TextColor3 = Theme.White
         b.Font = BODY_FONT
-        b.TextSize = 11
+        b.TextSize = 10
         b.Parent = actionCard
         Instance.new("UICorner", b).CornerRadius = UDim.new(1, 0)
         addWhiteBoxStroke(b, 1, 0.3)
@@ -1409,8 +1262,26 @@ local function RunUniversalScript()
     CreateToggle(CheatsTab, "Fast Interact", function(state) Config.FastInteract = state end)
 
     -- ============================================================
-    -- VISUALS TAB CONTROLS
+    -- VISUALS TAB CONTROLS (WITH OPTIONAL CUSTOM IMAGE BANNER)
     -- ============================================================
+    local resolvedImg = resolveCustomBannerImage()
+    if resolvedImg ~= "" then
+        local customBannerBox = Instance.new("Frame")
+        customBannerBox.Size = UDim2.new(1, -2, 0, 70)
+        customBannerBox.BackgroundColor3 = Theme.DarkGray
+        customBannerBox.ClipsDescendants = true
+        customBannerBox.Parent = VisualsTab
+        Instance.new("UICorner", customBannerBox).CornerRadius = UDim.new(0, 8)
+        addWhiteBoxStroke(customBannerBox, 1, 0.2)
+
+        local customImg = Instance.new("ImageLabel")
+        customImg.Size = UDim2.new(1, 0, 1, 0)
+        customImg.BackgroundTransparency = 1
+        customImg.Image = resolvedImg
+        customImg.ScaleType = Enum.ScaleType.Crop
+        customImg.Parent = customBannerBox
+    end
+
     CreateToggle(VisualsTab, "Player ESP", function(state) ToggleESPState(state) end)
     CreateToggle(VisualsTab, "Clean Vision (Fullbright & No Fog)", function(state) ToggleCleanVision(state) end)
 
@@ -1418,20 +1289,20 @@ local function RunUniversalScript()
     -- SONGS TAB CONTROLS
     -- ============================================================
     local nowPlayingCard = Instance.new("Frame")
-    nowPlayingCard.Size = UDim2.new(1, -2, 0, 44)
+    nowPlayingCard.Size = UDim2.new(1, -2, 0, 36)
     nowPlayingCard.BackgroundColor3 = Theme.DarkGray
     nowPlayingCard.Parent = SongsTab
-    Instance.new("UICorner", nowPlayingCard).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", nowPlayingCard).CornerRadius = UDim.new(0, 8)
     addWhiteBoxStroke(nowPlayingCard, 1, 0.25)
 
     local nowPlayingLbl = Instance.new("TextLabel")
-    nowPlayingLbl.Size = UDim2.new(1, -16, 1, 0)
-    nowPlayingLbl.Position = UDim2.new(0, 8, 0, 0)
+    nowPlayingLbl.Size = UDim2.new(1, -14, 1, 0)
+    nowPlayingLbl.Position = UDim2.new(0, 7, 0, 0)
     nowPlayingLbl.BackgroundTransparency = 1
     nowPlayingLbl.Text = "Now Playing: None (Stopped)"
     nowPlayingLbl.TextColor3 = Theme.White
     nowPlayingLbl.Font = BODY_FONT
-    nowPlayingLbl.TextSize = 10.5
+    nowPlayingLbl.TextSize = 10
     nowPlayingLbl.TextXAlignment = Enum.TextXAlignment.Left
     nowPlayingLbl.TextTruncate = Enum.TextTruncate.AtEnd
     nowPlayingLbl.Parent = nowPlayingCard
@@ -1445,7 +1316,7 @@ local function RunUniversalScript()
     end
 
     local transportRow = Instance.new("Frame")
-    transportRow.Size = UDim2.new(1, -2, 0, 36)
+    transportRow.Size = UDim2.new(1, -2, 0, 30)
     transportRow.BackgroundTransparency = 1
     transportRow.Parent = SongsTab
 
@@ -1457,7 +1328,7 @@ local function RunUniversalScript()
         b.Text = txt
         b.TextColor3 = Theme.White
         b.Font = BODY_FONT
-        b.TextSize = 10
+        b.TextSize = 9.5
         b.Parent = transportRow
         Instance.new("UICorner", b).CornerRadius = UDim.new(1, 0)
         addWhiteBoxStroke(b, 1, 0.25)
@@ -1512,31 +1383,31 @@ local function RunUniversalScript()
 
     for _, item in ipairs(bindableActions) do
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -2, 0, 40)
+        frame.Size = UDim2.new(1, -2, 0, 34)
         frame.BackgroundColor3 = Theme.DarkGray
         frame.Parent = KeyTab
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
         addWhiteBoxStroke(frame, 1, 0.25)
 
         local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -95, 1, 0)
-        lbl.Position = UDim2.new(0, 12, 0, 0)
+        lbl.Size = UDim2.new(1, -90, 1, 0)
+        lbl.Position = UDim2.new(0, 10, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.Text = item.Name
         lbl.TextColor3 = Theme.White
         lbl.Font = BODY_FONT
-        lbl.TextSize = 11
+        lbl.TextSize = 10
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.Parent = frame
 
         local bindBtn = Instance.new("TextButton")
-        bindBtn.Size = UDim2.fromOffset(80, 26)
-        bindBtn.Position = UDim2.new(1, -86, 0.5, -13)
+        bindBtn.Size = UDim2.fromOffset(74, 22)
+        bindBtn.Position = UDim2.new(1, -80, 0.5, -11)
         bindBtn.BackgroundColor3 = Theme.MidGray
         bindBtn.Text = "[ None ]"
         bindBtn.TextColor3 = Theme.White
         bindBtn.Font = BODY_FONT
-        bindBtn.TextSize = 10
+        bindBtn.TextSize = 9.5
         bindBtn.Parent = frame
         Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(1, 0)
         addWhiteBoxStroke(bindBtn, 1, 0.3)
@@ -1571,84 +1442,84 @@ local function RunUniversalScript()
     local LOG_FILTERS = { "ALL", "OUTPUT", "INFO", "WARN", "ERROR" }
 
     local topRowContainer = Instance.new("Frame")
-    topRowContainer.Size = UDim2.new(1, -2, 0, 115)
+    topRowContainer.Size = UDim2.new(1, -2, 0, 92)
     topRowContainer.BackgroundTransparency = 1
     topRowContainer.Parent = InfoTab
 
     local leftTelemetryCol = Instance.new("Frame")
-    leftTelemetryCol.Size = UDim2.new(0.58, -4, 1, 0)
+    leftTelemetryCol.Size = UDim2.new(0.60, -4, 1, 0)
     leftTelemetryCol.BackgroundTransparency = 1
     leftTelemetryCol.Parent = topRowContainer
 
     local telemetryLayout = Instance.new("UIListLayout")
-    telemetryLayout.Padding = UDim.new(0, 5)
+    telemetryLayout.Padding = UDim.new(0, 4)
     telemetryLayout.Parent = leftTelemetryCol
 
     local statusHeader = Instance.new("Frame")
-    statusHeader.Size = UDim2.new(1, 0, 0, 32)
+    statusHeader.Size = UDim2.new(1, 0, 0, 26)
     statusHeader.BackgroundColor3 = Theme.DarkGray
     statusHeader.Parent = leftTelemetryCol
-    Instance.new("UICorner", statusHeader).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", statusHeader).CornerRadius = UDim.new(0, 7)
     addWhiteBoxStroke(statusHeader, 1, 0.25)
 
     local serverTitleLbl = Instance.new("TextLabel")
     serverTitleLbl.Size = UDim2.new(0.55, 0, 1, 0)
-    serverTitleLbl.Position = UDim2.new(0, 8, 0, 0)
+    serverTitleLbl.Position = UDim2.new(0, 7, 0, 0)
     serverTitleLbl.BackgroundTransparency = 1
-    serverTitleLbl.Text = "SERVER STATUS"
+    serverTitleLbl.Text = "SERVER"
     serverTitleLbl.TextColor3 = Theme.White
     serverTitleLbl.Font = BODY_FONT
-    serverTitleLbl.TextSize = 10
+    serverTitleLbl.TextSize = 9.5
     serverTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
     serverTitleLbl.Parent = statusHeader
 
     local connStatusLbl = Instance.new("TextLabel")
-    connStatusLbl.Size = UDim2.new(0.45, -8, 1, 0)
+    connStatusLbl.Size = UDim2.new(0.45, -7, 1, 0)
     connStatusLbl.Position = UDim2.new(0.55, 0, 0, 0)
     connStatusLbl.BackgroundTransparency = 1
     connStatusLbl.Text = "CONNECTED"
     connStatusLbl.TextColor3 = Theme.White
     connStatusLbl.Font = BODY_FONT
-    connStatusLbl.TextSize = 9
+    connStatusLbl.TextSize = 8.5
     connStatusLbl.TextXAlignment = Enum.TextXAlignment.Right
     connStatusLbl.Parent = statusHeader
 
     local miniGrid = Instance.new("Frame")
-    miniGrid.Size = UDim2.new(1, 0, 0, 76)
+    miniGrid.Size = UDim2.new(1, 0, 0, 62)
     miniGrid.BackgroundTransparency = 1
     miniGrid.Parent = leftTelemetryCol
 
     local miniLayout = Instance.new("UIGridLayout")
-    miniLayout.CellSize = UDim2.new(0.48, 0, 0, 35)
-    miniLayout.CellPadding = UDim2.new(0.04, 0, 0, 6)
+    miniLayout.CellSize = UDim2.new(0.48, 0, 0, 29)
+    miniLayout.CellPadding = UDim2.new(0.04, 0, 0, 4)
     miniLayout.Parent = miniGrid
 
     local function createMiniStatChip(titleText)
         local card = Instance.new("Frame")
         card.BackgroundColor3 = Theme.DarkGray
         card.Parent = miniGrid
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 7)
         addWhiteBoxStroke(card, 1, 0.25)
 
         local cap = Instance.new("TextLabel")
-        cap.Size = UDim2.new(1, -8, 0, 12)
-        cap.Position = UDim2.new(0, 6, 0, 2)
+        cap.Size = UDim2.new(1, -6, 0, 10)
+        cap.Position = UDim2.new(0, 5, 0, 2)
         cap.BackgroundTransparency = 1
         cap.Text = titleText
         cap.TextColor3 = Theme.SubText
         cap.Font = BODY_FONT
-        cap.TextSize = 8
+        cap.TextSize = 7.5
         cap.TextXAlignment = Enum.TextXAlignment.Left
         cap.Parent = card
 
         local val = Instance.new("TextLabel")
-        val.Size = UDim2.new(1, -8, 0, 16)
-        val.Position = UDim2.new(0, 6, 0, 15)
+        val.Size = UDim2.new(1, -6, 0, 14)
+        val.Position = UDim2.new(0, 5, 0, 13)
         val.BackgroundTransparency = 1
         val.Text = "--"
         val.TextColor3 = Theme.White
         val.Font = BODY_FONT
-        val.TextSize = 10
+        val.TextSize = 9.5
         val.TextXAlignment = Enum.TextXAlignment.Left
         val.TextTruncate = Enum.TextTruncate.AtEnd
         val.Parent = card
@@ -1662,16 +1533,16 @@ local function RunUniversalScript()
     local uptimeValLbl = createMiniStatChip("UPTIME")
 
     local avatarCard = Instance.new("Frame")
-    avatarCard.Size = UDim2.new(0.42, -2, 1, 0)
-    avatarCard.Position = UDim2.new(0.58, 2, 0, 0)
+    avatarCard.Size = UDim2.new(0.40, -2, 1, 0)
+    avatarCard.Position = UDim2.new(0.60, 2, 0, 0)
     avatarCard.BackgroundColor3 = Theme.DarkGray
     avatarCard.Parent = topRowContainer
-    Instance.new("UICorner", avatarCard).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", avatarCard).CornerRadius = UDim.new(0, 7)
     addWhiteBoxStroke(avatarCard, 1, 0.2)
 
     local viewport = Instance.new("ViewportFrame")
-    viewport.Size = UDim2.new(1, -8, 1, -22)
-    viewport.Position = UDim2.new(0, 4, 0, 4)
+    viewport.Size = UDim2.new(1, -6, 1, -18)
+    viewport.Position = UDim2.new(0, 3, 0, 3)
     viewport.BackgroundTransparency = 1
     viewport.Ambient = Color3.fromRGB(200, 200, 200)
     viewport.LightColor = Theme.White
@@ -1679,13 +1550,13 @@ local function RunUniversalScript()
     viewport.Parent = avatarCard
 
     local avatarNameLbl = Instance.new("TextLabel")
-    avatarNameLbl.Size = UDim2.new(1, 0, 0, 16)
-    avatarNameLbl.Position = UDim2.new(0, 0, 1, -18)
+    avatarNameLbl.Size = UDim2.new(1, 0, 0, 14)
+    avatarNameLbl.Position = UDim2.new(0, 0, 1, -15)
     avatarNameLbl.BackgroundTransparency = 1
     avatarNameLbl.Text = string.sub(LocalPlayer.DisplayName, 1, 12)
     avatarNameLbl.TextColor3 = Theme.White
     avatarNameLbl.Font = BODY_FONT
-    avatarNameLbl.TextSize = 9
+    avatarNameLbl.TextSize = 8.5
     avatarNameLbl.TextXAlignment = Enum.TextXAlignment.Center
     avatarNameLbl.Parent = avatarCard
 
@@ -1752,7 +1623,7 @@ local function RunUniversalScript()
     end))
 
     local bottomStatsRow = Instance.new("Frame")
-    bottomStatsRow.Size = UDim2.new(1, -2, 0, 32)
+    bottomStatsRow.Size = UDim2.new(1, -2, 0, 26)
     bottomStatsRow.BackgroundColor3 = Theme.DarkGray
     bottomStatsRow.Parent = InfoTab
     Instance.new("UICorner", bottomStatsRow).CornerRadius = UDim.new(1, 0)
@@ -1760,25 +1631,25 @@ local function RunUniversalScript()
 
     local playersValLbl = Instance.new("TextLabel")
     playersValLbl.Size = UDim2.new(0.45, 0, 1, 0)
-    playersValLbl.Position = UDim2.new(0, 10, 0, 0)
+    playersValLbl.Position = UDim2.new(0, 8, 0, 0)
     playersValLbl.BackgroundTransparency = 1
     playersValLbl.Text = "PLAYERS: --"
     playersValLbl.TextColor3 = Theme.White
     playersValLbl.Font = BODY_FONT
-    playersValLbl.TextSize = 9
+    playersValLbl.TextSize = 8.5
     playersValLbl.TextXAlignment = Enum.TextXAlignment.Left
     playersValLbl.Parent = bottomStatsRow
 
     local jobIdValLbl = Instance.new("TextLabel")
-    jobIdValLbl.Size = UDim2.new(0.55, -10, 1, 0)
+    jobIdValLbl.Size = UDim2.new(0.55, -8, 1, 0)
     jobIdValLbl.Position = UDim2.new(0.45, 0, 0, 0)
     jobIdValLbl.BackgroundTransparency = 1
     local jobId = game.JobId
-    local jobShown = (jobId == "") and "STUDIO" or (string.sub(jobId, 1, 10) .. "...")
-    jobIdValLbl.Text = "JOB ID: " .. jobShown
+    local jobShown = (jobId == "") and "STUDIO" or (string.sub(jobId, 1, 8) .. "...")
+    jobIdValLbl.Text = "JOB: " .. jobShown
     jobIdValLbl.TextColor3 = Theme.SubText
     jobIdValLbl.Font = BODY_FONT
-    jobIdValLbl.TextSize = 9
+    jobIdValLbl.TextSize = 8.5
     jobIdValLbl.TextXAlignment = Enum.TextXAlignment.Right
     jobIdValLbl.Parent = bottomStatsRow
 
@@ -1798,14 +1669,14 @@ local function RunUniversalScript()
         end
         task.delay(1.2, function()
             if hubAlive then
-                jobIdValLbl.Text = "JOB ID: " .. jobShown
+                jobIdValLbl.Text = "JOB: " .. jobShown
                 jobIdValLbl.TextColor3 = Theme.SubText
             end
         end)
     end)
 
     local filterBar = Instance.new("Frame")
-    filterBar.Size = UDim2.new(1, -2, 0, 24)
+    filterBar.Size = UDim2.new(1, -2, 0, 20)
     filterBar.BackgroundTransparency = 1
     filterBar.Parent = InfoTab
 
@@ -1833,7 +1704,7 @@ local function RunUniversalScript()
         fBtn.Text = fName
         fBtn.TextColor3 = Theme.SubText
         fBtn.Font = BODY_FONT
-        fBtn.TextSize = 8
+        fBtn.TextSize = 7.5
         fBtn.Parent = filterBar
         Instance.new("UICorner", fBtn).CornerRadius = UDim.new(1, 0)
         addWhiteBoxStroke(fBtn, 1, 0.35)
@@ -1848,23 +1719,23 @@ local function RunUniversalScript()
     updateFilterColors()
 
     local searchBox = Instance.new("TextBox")
-    searchBox.Size = UDim2.new(1, -2, 0, 26)
+    searchBox.Size = UDim2.new(1, -2, 0, 24)
     searchBox.BackgroundColor3 = Theme.DarkGray
-    searchBox.PlaceholderText = "Search console logs..."
+    searchBox.PlaceholderText = "Search logs..."
     searchBox.PlaceholderColor3 = Theme.SubText
     searchBox.Text = ""
     searchBox.TextColor3 = Theme.White
     searchBox.Font = Enum.Font.Gotham
-    searchBox.TextSize = 11
+    searchBox.TextSize = 10
     searchBox.TextXAlignment = Enum.TextXAlignment.Left
     searchBox.ClearTextOnFocus = false
     searchBox.Parent = InfoTab
     Instance.new("UICorner", searchBox).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(searchBox, 1, 0.25)
-    Instance.new("UIPadding", searchBox).PaddingLeft = UDim.new(0, 10)
+    Instance.new("UIPadding", searchBox).PaddingLeft = UDim.new(0, 8)
 
     local consoleScroll = Instance.new("ScrollingFrame")
-    consoleScroll.Size = UDim2.new(1, -2, 0, 122)
+    consoleScroll.Size = UDim2.new(1, -2, 0, 82)
     consoleScroll.BackgroundColor3 = Theme.Black
     consoleScroll.BorderSizePixel = 0
     consoleScroll.ScrollBarThickness = 3
@@ -1872,7 +1743,7 @@ local function RunUniversalScript()
     consoleScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     consoleScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     consoleScroll.Parent = InfoTab
-    Instance.new("UICorner", consoleScroll).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", consoleScroll).CornerRadius = UDim.new(0, 7)
     addWhiteBoxStroke(consoleScroll, 1, 0.25)
 
     local consoleList = Instance.new("UIListLayout")
@@ -1881,14 +1752,14 @@ local function RunUniversalScript()
     consoleList.Parent = consoleScroll
 
     local consolePad = Instance.new("UIPadding")
-    consolePad.PaddingTop = UDim.new(0, 4)
-    consolePad.PaddingBottom = UDim.new(0, 4)
+    consolePad.PaddingTop = UDim.new(0, 3)
+    consolePad.PaddingBottom = UDim.new(0, 3)
     consolePad.PaddingLeft = UDim.new(0, 5)
-    consolePad.PaddingRight = UDim.new(0, 6)
+    consolePad.PaddingRight = UDim.new(0, 5)
     consolePad.Parent = consoleScroll
 
     local consoleControls = Instance.new("Frame")
-    consoleControls.Size = UDim2.new(1, -2, 0, 26)
+    consoleControls.Size = UDim2.new(1, -2, 0, 22)
     consoleControls.BackgroundTransparency = 1
     consoleControls.Parent = InfoTab
 
@@ -1899,7 +1770,7 @@ local function RunUniversalScript()
     clearConsoleBtn.Text = "CLEAR"
     clearConsoleBtn.TextColor3 = Theme.White
     clearConsoleBtn.Font = BODY_FONT
-    clearConsoleBtn.TextSize = 9
+    clearConsoleBtn.TextSize = 8.5
     clearConsoleBtn.Parent = consoleControls
     Instance.new("UICorner", clearConsoleBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(clearConsoleBtn, 1, 0.25)
@@ -1909,10 +1780,10 @@ local function RunUniversalScript()
     autoScrollBtn.Size = UDim2.new(0.42, 0, 1, 0)
     autoScrollBtn.Position = UDim2.new(0.38, 0, 0, 0)
     autoScrollBtn.BackgroundColor3 = Theme.White
-    autoScrollBtn.Text = "AUTO-SCROLL: ON"
+    autoScrollBtn.Text = "AUTO: ON"
     autoScrollBtn.TextColor3 = Theme.Black
     autoScrollBtn.Font = BODY_FONT
-    autoScrollBtn.TextSize = 9
+    autoScrollBtn.TextSize = 8.5
     autoScrollBtn.Parent = consoleControls
     Instance.new("UICorner", autoScrollBtn).CornerRadius = UDim.new(1, 0)
 
@@ -1923,7 +1794,7 @@ local function RunUniversalScript()
     logCountLbl.Text = "0/" .. MAX_LOGS
     logCountLbl.TextColor3 = Theme.SubText
     logCountLbl.Font = BODY_FONT
-    logCountLbl.TextSize = 9
+    logCountLbl.TextSize = 8.5
     logCountLbl.TextXAlignment = Enum.TextXAlignment.Right
     logCountLbl.Parent = consoleControls
 
@@ -1953,7 +1824,7 @@ local function RunUniversalScript()
         row.RichText = true
         row.TextWrapped = true
         row.Font = Enum.Font.Code
-        row.TextSize = 10
+        row.TextSize = 9.5
         row.TextColor3 = info.color
         row.TextXAlignment = Enum.TextXAlignment.Left
         row.TextYAlignment = Enum.TextYAlignment.Top
@@ -2039,7 +1910,7 @@ local function RunUniversalScript()
 
     autoScrollBtn.MouseButton1Click:Connect(function()
         autoScrollEnabled = not autoScrollEnabled
-        autoScrollBtn.Text = autoScrollEnabled and "AUTO-SCROLL: ON" or "AUTO-SCROLL: OFF"
+        autoScrollBtn.Text = autoScrollEnabled and "AUTO: ON" or "AUTO: OFF"
         autoScrollBtn.BackgroundColor3 = autoScrollEnabled and Theme.White or Theme.DarkGray
         autoScrollBtn.TextColor3 = autoScrollEnabled and Theme.Black or Theme.SubText
         if autoScrollEnabled then scrollQueued = 2 end
@@ -2172,8 +2043,7 @@ local function RunUniversalScript()
         if logCountLbl.Text ~= countStr then logCountLbl.Text = countStr end
     end))
 
-    SelectTab("Home")
-    pushConsoleLog("Brineland Hub (Home + Songs + Universal) initialized.", "INFO")
+    pushConsoleLog("Brineland Hub initialized.", "INFO")
     rebuildConsole()
 end
 
