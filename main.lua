@@ -204,24 +204,36 @@ local KEY_FILE_NAME = "BrinelandKey.txt"
 
 local function EnsureHiddenMusic()
     if not HIDDEN_MUSIC_ID or HIDDEN_MUSIC_ID == "" then return end
-    local existing = SoundService:FindFirstChild("BrinelandHiddenMusic")
-    if existing and existing:IsA("Sound") then
-        existing.SoundId = HIDDEN_MUSIC_ID
-        existing.Volume = HIDDEN_MUSIC_VOLUME
-        if not existing.IsPlaying then
-            pcall(function() existing:Play() end)
-        end
-        return existing
+    local sound = SoundService:FindFirstChild("BrinelandHiddenMusic")
+    if sound and not sound:IsA("Sound") then sound:Destroy(); sound = nil end
+    if not sound then
+        sound = Instance.new("Sound")
+        sound.Name = "BrinelandHiddenMusic"
+        sound.Parent = SoundService
     end
-
-    local s = Instance.new("Sound")
-    s.Name = "BrinelandHiddenMusic"
-    s.SoundId = HIDDEN_MUSIC_ID
-    s.Volume = HIDDEN_MUSIC_VOLUME
-    s.Looped = true
-    s.Parent = SoundService
-    pcall(function() s:Play() end)
-    return s
+    if sound.SoundId ~= HIDDEN_MUSIC_ID then sound.SoundId = HIDDEN_MUSIC_ID end
+    sound.Volume = HIDDEN_MUSIC_VOLUME
+    sound.Looped = true
+    -- Sound may still be loading when the key screen opens. Play again once
+    -- Roblox reports it loaded, and provide a useful warning if it cannot load.
+    if not sound:GetAttribute("BrinelandMusicLoading") then
+        sound:SetAttribute("BrinelandMusicLoading", true)
+        task.spawn(function()
+            local ok, err = pcall(function()
+                local ContentProvider = game:GetService("ContentProvider")
+                ContentProvider:PreloadAsync({sound})
+            end)
+            if not sound.Parent then return end
+            if sound.IsLoaded then
+                if not sound.IsPlaying then sound:Play() end
+            else
+                warn("[BRINELAND] Music could not load. Check that the audio ID is valid and permitted in this experience." .. (ok and "" or (" " .. tostring(err))))
+            end
+            sound:SetAttribute("BrinelandMusicLoading", false)
+        end)
+    end
+    if not sound.IsPlaying then pcall(function() sound:Play() end) end
+    return sound
 end
 
 local function MakeDraggable(guiObject, dragHandle)
@@ -441,6 +453,10 @@ local function RunUniversalScript()
     local Camera           = Workspace.CurrentCamera
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local runtimeEnv = (type(getgenv) == "function" and getgenv()) or _G
+    if type(runtimeEnv.BrinelandUniversalCleanup) == "function" then
+        pcall(runtimeEnv.BrinelandUniversalCleanup)
+    end
     if PlayerGui:FindFirstChild("BrinelandUniversalHub") then
         PlayerGui.BrinelandUniversalHub:Destroy()
     end
@@ -617,7 +633,7 @@ local function RunUniversalScript()
         end
 
         moveConnections.FlightLoop = RunService.Heartbeat:Connect(function(deltaTime)
-            if not Config.FlyEnabled or not rootPart or not char:IsDescendantOf(Workspace) then return end
+            if not Config.FlyEnabled or Config.Freecam or not rootPart or not char:IsDescendantOf(Workspace) then return end
             rootPart.Velocity = Vector3.new(0, 0.1, 0)
 
             local flightVector = GetFlightVector()
@@ -702,23 +718,57 @@ local function RunUniversalScript()
         end
     end
 
-    -- Freecam: drag open screen to look; use the existing thumbstick to move.
-    -- No additional GUI or fly buttons are created.
+    -- Freecam: keep the character in place and move only a Scriptable camera.
+    -- Mobile: thumbstick moves the camera; drag empty screen to look. Point up or
+    -- down while moving forward to rise or descend. No extra controls are added.
+    local function unfreezeFreecamCharacter()
+        if fc.root then pcall(function() fc.root.Anchored = fc.oldAnchored end) end
+        if fc.frozen then
+            pcall(function()
+                fc.frozen.WalkSpeed = fc.oldWalk
+                fc.frozen.AutoRotate = fc.oldAutoRotate
+                fc.frozen:SetStateEnabled(Enum.HumanoidStateType.Jumping, fc.oldJumpEnabled)
+            end)
+        end
+        fc.root, fc.frozen = nil, nil
+    end
+    local function freezeFreecamCharacter()
+        local char = LocalPlayer.Character
+        local h = char and char:FindFirstChildOfClass("Humanoid")
+        local r = char and char:FindFirstChild("HumanoidRootPart")
+        if h ~= fc.frozen or r ~= fc.root then
+            unfreezeFreecamCharacter()
+            fc.frozen, fc.root = h, r
+            if h then
+                fc.oldWalk, fc.oldAutoRotate = h.WalkSpeed, h.AutoRotate
+                fc.oldJumpEnabled = h:GetStateEnabled(Enum.HumanoidStateType.Jumping)
+            end
+            if r then fc.oldAnchored = r.Anchored end
+        end
+        if h then h.WalkSpeed = 0; h.AutoRotate = false; h.Jump = false; h:SetStateEnabled(Enum.HumanoidStateType.Jumping, false) end
+        if r then r.Anchored = true end
+    end
     local function setFreecam(on)
         if Config.Freecam == on then return end
-        local cam = Workspace.CurrentCamera
-        if on and not cam then warn("[BRINELAND] No camera available for freecam."); return end
+        local camera = Workspace.CurrentCamera
+        if on and not camera then warn("[BRINELAND] No camera available for freecam."); return end
         Config.Freecam = on
         if on then
-            fc.camera = cam; fc.oldType = cam.CameraType; fc.oldSubject = cam.CameraSubject
-            fc.position = cam.CFrame.Position
-            local pitch, yaw = cam.CFrame:ToOrientation()
-            fc.pitch = pitch; fc.yaw = yaw
-            cam.CameraType = Enum.CameraType.Scriptable
+            fc.camera = camera; fc.oldType = camera.CameraType; fc.oldSubject = camera.CameraSubject
+            fc.oldCFrame = camera.CFrame
+            fc.position = camera.CFrame.Position
+            fc.pitch, fc.yaw = camera.CFrame:ToOrientation()
+            freezeFreecamCharacter()
+            camera.CameraType = Enum.CameraType.Scriptable
         else
-            if fc.frozen and fc.oldWalk ~= nil then pcall(function() fc.frozen.WalkSpeed = fc.oldWalk end) end
-            fc.frozen, fc.oldWalk, fc.touch, fc.mouse = nil, nil, nil, false
-            if fc.camera then pcall(function() fc.camera.CameraType = fc.oldType; fc.camera.CameraSubject = fc.oldSubject end) end
+            unfreezeFreecamCharacter()
+            fc.touch, fc.mouse = nil, false
+            if fc.camera then pcall(function()
+                fc.camera.CFrame = fc.oldCFrame
+                local currentHumanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                fc.camera.CameraSubject = (fc.oldSubject and fc.oldSubject.Parent and fc.oldSubject) or currentHumanoid
+                fc.camera.CameraType = fc.oldType
+            end) end
             fc.camera = nil
         end
     end
@@ -742,13 +792,15 @@ local function RunUniversalScript()
         end
     end))
     trackConn(RunService.RenderStepped:Connect(function(dt)
-        if not Config.Freecam or not fc.camera or not fc.camera.Parent then return end
-        local char = LocalPlayer.Character
-        local h = char and char:FindFirstChildOfClass("Humanoid")
-        if h then
-            if fc.frozen ~= h then fc.frozen, fc.oldWalk = h, h.WalkSpeed end
-            h.WalkSpeed = 0
+        if not Config.Freecam then return end
+        if Workspace.CurrentCamera ~= fc.camera then
+            -- Cameras can be replaced by the game, especially after respawn.
+            if fc.camera then pcall(function() fc.camera.CameraType = fc.oldType; fc.camera.CameraSubject = fc.oldSubject end) end
+            fc.camera = Workspace.CurrentCamera
+            if not fc.camera then return end
+            fc.oldType, fc.oldSubject, fc.oldCFrame = fc.camera.CameraType, fc.camera.CameraSubject, fc.camera.CFrame
         end
+        freezeFreecamCharacter()
         local mv = Vector3.zero
         if controls then
             local ok, v = pcall(function() return controls:GetMoveVector() end)
@@ -761,10 +813,13 @@ local function RunUniversalScript()
         end
         local cf = CFrame.new(fc.position) * CFrame.Angles(0, fc.yaw, 0) * CFrame.Angles(fc.pitch, 0, 0)
         local direction = cf.RightVector * mv.X - cf.LookVector * mv.Z
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0,1,0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then direction -= Vector3.new(0,1,0) end
+        if not UserInputService:GetFocusedTextBox() then
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then direction -= Vector3.new(0,1,0) end
+        end
         if direction.Magnitude > 1 then direction = direction.Unit end
         fc.position += direction * fc.speed * math.min(dt, 0.1)
+        fc.camera.CameraType = Enum.CameraType.Scriptable
         fc.camera.CFrame = CFrame.new(fc.position) * CFrame.Angles(0, fc.yaw, 0) * CFrame.Angles(fc.pitch, 0, 0)
     end))
 
@@ -1003,7 +1058,8 @@ local function RunUniversalScript()
     CloseBtn.Parent = TopBar
     Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
     addWhiteBoxStroke(CloseBtn, 1, 0.2)
-    CloseBtn.MouseButton1Click:Connect(function()
+    local function cleanupHub()
+        if not hubAlive then return end
         hubAlive = false
         DisableFly()
         setFreecam(false); setXray(false); Config.AutoRejoin = false
@@ -1012,6 +1068,11 @@ local function RunUniversalScript()
         if Config.CleanVision then ToggleCleanVision(false) end
         for p in pairs(ESPStorage) do RemovePlayerESP(p) end
         for _, c in ipairs(hubConns) do pcall(function() c:Disconnect() end) end
+        if runtimeEnv.BrinelandUniversalCleanup == cleanupHub then runtimeEnv.BrinelandUniversalCleanup = nil end
+    end
+    runtimeEnv.BrinelandUniversalCleanup = cleanupHub
+    CloseBtn.MouseButton1Click:Connect(function()
+        cleanupHub()
         local closeTween = TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
             Size = UDim2.fromOffset(HUB_WIDTH, 0),
             BackgroundTransparency = 1
@@ -1205,6 +1266,8 @@ local function RunUniversalScript()
         end)
     end
 
+    local profileControls = {}
+    local bindButtons = {}
     local function CreateToggle(parentContainer, text, callback)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, -2, 0, 36)
@@ -1246,8 +1309,10 @@ local function RunUniversalScript()
         btn.Parent = frame
 
         local active = false
-        btn.MouseButton1Click:Connect(function()
-            active = not active
+        local function setActive(value)
+            value = value == true
+            if active == value then return end
+            active = value
             TweenService:Create(knob, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 Position = active and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
                 BackgroundColor3 = active and Theme.Black or Theme.White
@@ -1256,7 +1321,9 @@ local function RunUniversalScript()
                 BackgroundColor3 = active and Theme.White or Theme.MidGray
             }):Play()
             callback(active)
-        end)
+        end
+        profileControls[text] = { kind = "toggle", get = function() return active end, set = setActive }
+        btn.MouseButton1Click:Connect(function() setActive(not active) end)
     end
 
     local function CreateSlider(parentContainer, text, minVal, maxVal, defaultVal, showNumbers, callback)
@@ -1293,14 +1360,23 @@ local function RunUniversalScript()
         Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 
         local sliding = false
-        local function UpdateValue(input)
-            local pos = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+        local currentValue = defaultVal
+        local function setValue(value)
+            if type(value) ~= "number" or value ~= value then return end
+            local val = math.clamp(value, minVal, maxVal)
+            currentValue = val
+            local pos = (val - minVal) / (maxVal - minVal)
             TweenService:Create(fill, TweenInfo.new(0.06), { Size = UDim2.new(pos, 0, 1, 0) }):Play()
-            local val = math.floor(minVal + (maxVal - minVal) * pos)
             if showNumbers then
                 lbl.Text = text .. ": " .. tostring(val)
             end
             callback(val)
+        end
+        profileControls[text] = { kind = "slider", get = function() return currentValue end, set = setValue }
+        local function UpdateValue(input)
+            if track.AbsoluteSize.X <= 0 then return end
+            local pos = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+            setValue(math.floor(minVal + (maxVal - minVal) * pos))
         end
 
         track.InputBegan:Connect(function(input)
@@ -1375,7 +1451,7 @@ local function RunUniversalScript()
     badgeSub.Size = UDim2.new(1, -10, 0, 44)
     badgeSub.Position = UDim2.new(0, 5, 0, 36)
     badgeSub.BackgroundTransparency = 1
-    badgeSub.Text = "UNIVERSAL\nEDITION\n@" .. LocalPlayer.Name
+    badgeSub.Text = "UNIVERSAL\nEDITION"
     badgeSub.TextColor3 = Theme.SubText
     badgeSub.Font = BODY_FONT
     badgeSub.TextSize = 8.5
@@ -1746,12 +1822,16 @@ local function RunUniversalScript()
     -- ============================================================
     -- KEY TAB
     -- ============================================================
+    local function toggleByName(name)
+        local control = profileControls[name]
+        if control then control.set(not control.get()) end
+    end
     local bindableActions = {
-        {Name = "Fly Toggle", Action = function() if Config.FlyEnabled then DisableFly() else EnableFly() end end},
-        {Name = "Noclip Toggle", Action = function() Config.Noclip = not Config.Noclip; if not Config.Noclip then restoreCollisions() end end},
-        {Name = "Player ESP Toggle", Action = function() ToggleESPState(not Config.PlayerESP) end},
-        {Name = "Clean Vision Toggle", Action = function() ToggleCleanVision(not Config.CleanVision) end},
-        {Name = "Speed Boost Toggle", Action = function() Config.SpeedEnabled = not Config.SpeedEnabled; if not Config.SpeedEnabled then restoreSpeed() end end}
+        {Name = "Fly Toggle", Action = function() toggleByName("Enable Fly") end},
+        {Name = "Noclip Toggle", Action = function() toggleByName("Noclip") end},
+        {Name = "Player ESP Toggle", Action = function() toggleByName("Player ESP") end},
+        {Name = "Clean Vision Toggle", Action = function() toggleByName("Clean Vision (Fullbright & No Fog)") end},
+        {Name = "Speed Boost Toggle", Action = function() toggleByName("Enable WalkSpeed") end}
     }
 
     for _, item in ipairs(bindableActions) do
@@ -1785,6 +1865,7 @@ local function RunUniversalScript()
         Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(1, 0)
         addWhiteBoxStroke(bindBtn, 1, 0.3)
 
+        bindButtons[item.Name] = bindBtn
         local listening = false
         bindBtn.MouseButton1Click:Connect(function()
             listening = true
@@ -1801,6 +1882,114 @@ local function RunUniversalScript()
             end
         end))
     end
+
+    -- Named profiles save only this universal hub's controls and keybinds.
+    -- Files are stored by the executor, not by Roblox or across devices.
+    local profileFile = "Brineland_Configs.json"
+    local profileHttp = game:GetService("HttpService")
+    local profileName = Instance.new("TextBox")
+    profileName.Size = UDim2.new(1, -2, 0, 34)
+    profileName.BackgroundColor3 = Theme.DarkGray
+    profileName.PlaceholderText = "Config name (example: Default)"
+    profileName.PlaceholderColor3 = Theme.SubText
+    profileName.Text = ""
+    profileName.ClearTextOnFocus = false
+    profileName.TextColor3 = Theme.White
+    profileName.Font = BODY_FONT
+    profileName.TextSize = 11
+    profileName.Parent = SettingsTab
+    Instance.new("UICorner", profileName).CornerRadius = UDim.new(0, 8)
+    addWhiteBoxStroke(profileName, 1, 0.25)
+    local profileStatus = Instance.new("TextLabel")
+    profileStatus.Size = UDim2.new(1, -2, 0, 52)
+    profileStatus.BackgroundTransparency = 1
+    profileStatus.Text = "Enter a name, then save or load."
+    profileStatus.TextColor3 = Theme.SubText
+    profileStatus.Font = BODY_FONT
+    profileStatus.TextSize = 10
+    profileStatus.TextWrapped = true
+    profileStatus.Parent = SettingsTab
+    local function configName()
+        local n = profileName.Text:match("^%s*(.-)%s*$") or ""
+        if n == "" or #n > 40 then return nil end
+        return n
+    end
+    local function readProfiles()
+        if type(isfile) ~= "function" or type(readfile) ~= "function" then return nil, "File storage not supported by this executor." end
+        local ok, exists = pcall(isfile, profileFile)
+        if not ok then return nil, "Cannot access config storage." end
+        if not exists then return {} end
+        local good, data = pcall(function() return profileHttp:JSONDecode(readfile(profileFile)) end)
+        if not good or type(data) ~= "table" then return nil, "Config file is unreadable; it was not overwritten." end
+        return data
+    end
+    local function writeProfiles(data)
+        if type(writefile) ~= "function" then return false, "Saving configs is not supported by this executor." end
+        local ok = pcall(function() writefile(profileFile, profileHttp:JSONEncode(data)) end)
+        if not ok then return false, "Could not save the config file." end
+        return true
+    end
+    CreateButton(SettingsTab, "Save Named Config", function()
+        local name = configName()
+        if not name then profileStatus.Text = "Enter a config name (1-40 characters)."; return end
+        local data, err = readProfiles()
+        if not data then profileStatus.Text = err; return end
+        local values, keys = {}, {}
+        for label, control in pairs(profileControls) do values[label] = control.get() end
+        for label, key in pairs(Keybinds) do keys[label] = key.Name end
+        data[name] = { version = 1, controls = values, keybinds = keys }
+        local ok, why = writeProfiles(data)
+        profileStatus.Text = ok and ("Saved config: " .. name) or why
+    end)
+    CreateButton(SettingsTab, "Load Named Config", function()
+        local name = configName()
+        if not name then profileStatus.Text = "Enter a config name."; return end
+        local data, err = readProfiles()
+        if not data then profileStatus.Text = err; return end
+        local saved = data[name]
+        if type(saved) ~= "table" or type(saved.controls) ~= "table" then profileStatus.Text = "Config not found or invalid: " .. name; return end
+        local failures = 0
+        -- Turn toggles off first, set values, then turn requested toggles on.
+        for _, control in pairs(profileControls) do
+            if control.kind == "toggle" then local ok = pcall(control.set, false); if not ok then failures += 1 end end
+        end
+        for label, control in pairs(profileControls) do
+            local value = saved.controls[label]
+            if control.kind == "slider" and type(value) == "number" then local ok = pcall(control.set, value); if not ok then failures += 1 end end
+        end
+        for label, control in pairs(profileControls) do
+            local value = saved.controls[label]
+            if control.kind == "toggle" and value == true then local ok = pcall(control.set, true); if not ok then failures += 1 end end
+        end
+        if type(saved.keybinds) == "table" then
+            for label, button in pairs(bindButtons) do
+                local nameOfKey = saved.keybinds[label]
+                local key
+                if type(nameOfKey) == "string" then pcall(function() key = Enum.KeyCode[nameOfKey] end) end
+                Keybinds[label] = key
+                button.Text = key and ("[" .. key.Name .. "]") or "[ None ]"
+            end
+        end
+        profileStatus.Text = failures == 0 and ("Loaded config: " .. name) or ("Loaded with " .. failures .. " control errors; check console.")
+    end)
+    CreateButton(SettingsTab, "Delete Named Config", function()
+        local name = configName()
+        if not name then profileStatus.Text = "Enter a config name."; return end
+        local data, err = readProfiles()
+        if not data then profileStatus.Text = err; return end
+        if data[name] == nil then profileStatus.Text = "Config not found: " .. name; return end
+        data[name] = nil
+        local ok, why = writeProfiles(data)
+        profileStatus.Text = ok and ("Deleted config: " .. name) or why
+    end)
+    CreateButton(SettingsTab, "Show Saved Config Names", function()
+        local data, err = readProfiles()
+        if not data then profileStatus.Text = err; return end
+        local names = {}
+        for name in pairs(data) do if type(name) == "string" then table.insert(names, name) end end
+        table.sort(names)
+        profileStatus.Text = #names > 0 and ("Configs: " .. table.concat(names, ", ")) or "No saved configs."
+    end)
 
     -- ============================================================
     -- INFO TAB
