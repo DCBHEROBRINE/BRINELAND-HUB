@@ -151,14 +151,10 @@ end
 -------------------------------------------------------------------------------
 
 -- ============================================================
--- CUSTOM ASSETS, HIDDEN MUSIC & MONOCHROME THEME
+-- CUSTOM ASSETS & MONOCHROME THEME
 -- ============================================================
 local CUSTOM_BANNER_FILE = "brineland_banner.png"
 local CUSTOM_BANNER_ID   = ""
-
--- Hidden background audio (Asset ID 108997017247273)
-local HIDDEN_MUSIC_ID     = "rbxassetid://108997017247273"
-local HIDDEN_MUSIC_VOLUME = 0.45
 
 local Theme = {
     Black      = Color3.fromRGB(10, 10, 12),
@@ -198,43 +194,14 @@ end
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 local KEY_FILE_NAME = "BrinelandKey.txt"
 
-local function EnsureHiddenMusic()
-    if not HIDDEN_MUSIC_ID or HIDDEN_MUSIC_ID == "" then return end
-    local sound = SoundService:FindFirstChild("BrinelandHiddenMusic")
-    if sound and not sound:IsA("Sound") then sound:Destroy(); sound = nil end
-    if not sound then
-        sound = Instance.new("Sound")
-        sound.Name = "BrinelandHiddenMusic"
-        sound.Parent = SoundService
-    end
-    if sound.SoundId ~= HIDDEN_MUSIC_ID then sound.SoundId = HIDDEN_MUSIC_ID end
-    sound.Volume = HIDDEN_MUSIC_VOLUME
-    sound.Looped = true
-    -- Sound may still be loading when the key screen opens. Play again once
-    -- Roblox reports it loaded, and provide a useful warning if it cannot load.
-    if not sound:GetAttribute("BrinelandMusicLoading") then
-        sound:SetAttribute("BrinelandMusicLoading", true)
-        task.spawn(function()
-            local ok, err = pcall(function()
-                local ContentProvider = game:GetService("ContentProvider")
-                ContentProvider:PreloadAsync({sound})
-            end)
-            if not sound.Parent then return end
-            if sound.IsLoaded then
-                if not sound.IsPlaying then sound:Play() end
-            else
-                warn("[BRINELAND] Music could not load. Check that the audio ID is valid and permitted in this experience." .. (ok and "" or (" " .. tostring(err))))
-            end
-            sound:SetAttribute("BrinelandMusicLoading", false)
-        end)
-    end
-    if not sound.IsPlaying then pcall(function() sound:Play() end) end
-    return sound
-end
+-- Remove only the sound left behind by an older Brineland version, if any.
+pcall(function()
+    local old = game:GetService("SoundService"):FindFirstChild("BrinelandHiddenMusic")
+    if old then old:Destroy() end
+end)
 
 local function MakeDraggable(guiObject, dragHandle)
     local handle = dragHandle or guiObject
@@ -261,7 +228,6 @@ end
 -- BRINELAND CUSTOM UI GATEWAY (MOVABLE KEY GUI)
 -- ============================================================
 local function VerifyAndLoadHub()
-    EnsureHiddenMusic()
 
     if readfile and isfile and isfile(KEY_FILE_NAME) then
         local okRead, savedKey = pcall(readfile, KEY_FILE_NAME)
@@ -440,10 +406,9 @@ if priorEnv.BrinelandIY and type(priorEnv.BrinelandIY.Destroy) == "function" the
 VerifyAndLoadHub()
 
 -- ============================================================
--- UNIVERSAL HUB (WIDER SIDEWAYS + CLEAN HOME LAYOUT + HIDDEN AUDIO)
+-- UNIVERSAL HUB (WIDER SIDEWAYS + CLEAN HOME LAYOUT)
 -- ============================================================
 local function RunUniversalScript()
-    EnsureHiddenMusic()
 
     local Workspace        = game:GetService("Workspace")
     local RunService       = game:GetService("RunService")
@@ -718,9 +683,9 @@ local function RunUniversalScript()
         end
     end
 
-    -- Freecam: keep the character in place and move only a Scriptable camera.
-    -- Mobile: thumbstick moves the camera; drag empty screen to look. Point up or
-    -- down while moving forward to rise or descend. No extra controls are added.
+    -- Freecam moves only the camera. It does not create a joystick or extra
+    -- buttons. The existing mobile thumbstick and a raw-touch fallback are used.
+    local freecamRenderName = "Brineland_Freecam_Render"
     local function unfreezeFreecamCharacter()
         if fc.root then pcall(function() fc.root.Anchored = fc.oldAnchored end) end
         if fc.frozen then
@@ -748,21 +713,78 @@ local function RunUniversalScript()
         if h then h.WalkSpeed = 0; h.AutoRotate = false; h.Jump = false; h:SetStateEnabled(Enum.HumanoidStateType.Jumping, false) end
         if r then r.Anchored = true end
     end
+    -- Ignore touches on our own panel. Processed touches are still accepted
+    -- elsewhere: Roblox's thumbstick commonly marks its touch as processed.
+    local function touchOverHub(pos)
+        local gui = PlayerGui:FindFirstChild("BrinelandUniversalHub")
+        local frame = gui and gui:FindFirstChild("BrinelandMainFrame")
+        if not (gui and gui.Enabled and frame and frame.Visible) then return false end
+        local p, size = frame.AbsolutePosition, frame.AbsoluteSize
+        return pos.X >= p.X and pos.X <= p.X + size.X and pos.Y >= p.Y and pos.Y <= p.Y + size.Y
+    end
+    local function freecamFrame(dt)
+        if not hubAlive or not Config.Freecam then return end
+        if Workspace.CurrentCamera ~= fc.camera then
+            if fc.camera then pcall(function() fc.camera.CameraType = fc.oldType; fc.camera.CameraSubject = fc.oldSubject end) end
+            fc.camera = Workspace.CurrentCamera
+            if not fc.camera then return end
+            fc.oldType, fc.oldSubject, fc.oldCFrame = fc.camera.CameraType, fc.camera.CameraSubject, fc.camera.CFrame
+        end
+        if not fc.camera then return end
+        freezeFreecamCharacter()
+        local mv = Vector3.zero
+        if controls then
+            local ok, v = pcall(function() return controls:GetMoveVector() end)
+            if ok and typeof(v) == "Vector3" then mv = v end
+        end
+        -- Some games/executors do not expose PlayerModule controls or return
+        -- zero while the character is frozen. Use the existing left-thumb touch.
+        if mv.Magnitude < 0.05 and fc.moveTouch and fc.moveStart then
+            local d = fc.moveTouch.Position - fc.moveStart
+            local radius = math.max(35, math.min(fc.camera.ViewportSize.X, fc.camera.ViewportSize.Y) * 0.12)
+            local x, z = d.X / radius, d.Y / radius
+            local magnitude = math.sqrt(x * x + z * z)
+            if magnitude > 1 then x, z = x / magnitude, z / magnitude end
+            if magnitude < 0.08 then x, z = 0, 0 end
+            mv = Vector3.new(x, 0, z)
+        end
+        if mv.Magnitude < 0.05 and not UserInputService:GetFocusedTextBox() then
+            local x = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
+            local z = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+            mv = Vector3.new(x, 0, z)
+        end
+        local cf = CFrame.new(fc.position) * CFrame.Angles(0, fc.yaw, 0) * CFrame.Angles(fc.pitch, 0, 0)
+        local direction = cf.RightVector * mv.X - cf.LookVector * mv.Z
+        if not UserInputService:GetFocusedTextBox() then
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then direction -= Vector3.new(0, 1, 0) end
+        end
+        if direction.Magnitude > 1 then direction = direction.Unit end
+        fc.position += direction * fc.speed * math.min(dt, 0.1)
+        fc.camera.CameraType = Enum.CameraType.Scriptable
+        fc.camera.CFrame = CFrame.new(fc.position) * CFrame.Angles(0, fc.yaw, 0) * CFrame.Angles(fc.pitch, 0, 0)
+        fc.camera.Focus = fc.camera.CFrame * CFrame.new(0, 0, -10)
+    end
     local function setFreecam(on)
         if Config.Freecam == on then return end
         local camera = Workspace.CurrentCamera
         if on and not camera then warn("[BRINELAND] No camera available for freecam."); return end
-        Config.Freecam = on
         if on then
+            Config.Freecam = true
             fc.camera = camera; fc.oldType = camera.CameraType; fc.oldSubject = camera.CameraSubject
             fc.oldCFrame = camera.CFrame
             fc.position = camera.CFrame.Position
             fc.pitch, fc.yaw = camera.CFrame:ToOrientation()
             freezeFreecamCharacter()
             camera.CameraType = Enum.CameraType.Scriptable
+            -- Run after Roblox's default camera controller so it cannot overwrite
+            -- our position in the same frame.
+            RunService:BindToRenderStep(freecamRenderName, Enum.RenderPriority.Last.Value, freecamFrame)
         else
+            Config.Freecam = false
+            RunService:UnbindFromRenderStep(freecamRenderName)
             unfreezeFreecamCharacter()
-            fc.touch, fc.mouse = nil, false
+            fc.lookTouch, fc.moveTouch, fc.moveStart, fc.last, fc.mouse = nil, nil, nil, nil, false
             if fc.camera then pcall(function()
                 fc.camera.CFrame = fc.oldCFrame
                 local currentHumanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -773,54 +795,34 @@ local function RunUniversalScript()
         end
     end
     trackConn(UserInputService.InputBegan:Connect(function(input, processed)
-        if not Config.Freecam or processed then return end
-        if input.UserInputType == Enum.UserInputType.Touch and not fc.touch then fc.touch = input; fc.last = input.Position
-        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then fc.mouse = true end
+        if not Config.Freecam then return end
+        if input.UserInputType == Enum.UserInputType.Touch then
+            if touchOverHub(input.Position) then return end
+            local camera = Workspace.CurrentCamera
+            local size = camera and camera.ViewportSize or Vector2.new(800, 600)
+            if input.Position.X < size.X * 0.5 and input.Position.Y > size.Y * 0.45 then
+                if not fc.moveTouch then fc.moveTouch = input; fc.moveStart = input.Position end
+            elseif not fc.lookTouch then
+                fc.lookTouch = input; fc.last = input.Position
+            end
+        elseif not processed and input.UserInputType == Enum.UserInputType.MouseButton2 then
+            fc.mouse = true
+        end
     end))
     trackConn(UserInputService.InputEnded:Connect(function(input)
-        if input == fc.touch then fc.touch = nil end
+        if input == fc.lookTouch then fc.lookTouch, fc.last = nil, nil end
+        if input == fc.moveTouch then fc.moveTouch, fc.moveStart = nil, nil end
         if input.UserInputType == Enum.UserInputType.MouseButton2 then fc.mouse = false end
     end))
     trackConn(UserInputService.InputChanged:Connect(function(input)
         if not Config.Freecam then return end
         local delta
-        if input == fc.touch then delta = input.Position - fc.last; fc.last = input.Position
+        if input == fc.lookTouch and fc.last then delta = input.Position - fc.last; fc.last = input.Position
         elseif fc.mouse and input.UserInputType == Enum.UserInputType.MouseMovement then delta = input.Delta end
         if delta then
             fc.yaw = fc.yaw - delta.X * 0.006
             fc.pitch = math.clamp(fc.pitch - delta.Y * 0.006, -1.5, 1.5)
         end
-    end))
-    trackConn(RunService.RenderStepped:Connect(function(dt)
-        if not Config.Freecam then return end
-        if Workspace.CurrentCamera ~= fc.camera then
-            -- Cameras can be replaced by the game, especially after respawn.
-            if fc.camera then pcall(function() fc.camera.CameraType = fc.oldType; fc.camera.CameraSubject = fc.oldSubject end) end
-            fc.camera = Workspace.CurrentCamera
-            if not fc.camera then return end
-            fc.oldType, fc.oldSubject, fc.oldCFrame = fc.camera.CameraType, fc.camera.CameraSubject, fc.camera.CFrame
-        end
-        freezeFreecamCharacter()
-        local mv = Vector3.zero
-        if controls then
-            local ok, v = pcall(function() return controls:GetMoveVector() end)
-            if ok and typeof(v) == "Vector3" then mv = v end
-        end
-        if mv.Magnitude == 0 and not UserInputService:GetFocusedTextBox() then
-            local x = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
-            local z = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
-            mv = Vector3.new(x, 0, z)
-        end
-        local cf = CFrame.new(fc.position) * CFrame.Angles(0, fc.yaw, 0) * CFrame.Angles(fc.pitch, 0, 0)
-        local direction = cf.RightVector * mv.X - cf.LookVector * mv.Z
-        if not UserInputService:GetFocusedTextBox() then
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0,1,0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then direction -= Vector3.new(0,1,0) end
-        end
-        if direction.Magnitude > 1 then direction = direction.Unit end
-        fc.position += direction * fc.speed * math.min(dt, 0.1)
-        fc.camera.CameraType = Enum.CameraType.Scriptable
-        fc.camera.CFrame = CFrame.new(fc.position) * CFrame.Angles(0, fc.yaw, 0) * CFrame.Angles(fc.pitch, 0, 0)
     end))
 
     -- Rejoin now is a button; auto rejoin is a separate on/off switch.
@@ -980,6 +982,7 @@ local function RunUniversalScript()
     local HUB_HEIGHT = 315
 
     local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "BrinelandMainFrame"
     MainFrame.Size = UDim2.fromOffset(HUB_WIDTH, 0)
     MainFrame.Position = UDim2.fromOffset(16, 48)
     MainFrame.BackgroundColor3 = Theme.Black
