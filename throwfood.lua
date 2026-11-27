@@ -1,13 +1,14 @@
+-- BRINELAND: startup diagnostics and mobile Home layout
+-- Paste this entire file into the executor after joining the game.
+print("[Brineland] Starting Throw Food hub...")
+local startupOK, startupError = xpcall(function()
 -- ============================================================
 -- BRINELAND HUB: THROW FOOD FOR ANIMALS (MASTER EDITION, v3)
 -- Repository: https://github.com/DCBHEROBRINE/BRINELAND-HUB.git
 --
--- v7 changes:
---   * The pill at the top only shows while the window is hidden (window open = no pill).
---   * Removed Path Lock, Auto Equip Tool and Auto Click. Anti-AFK stays and is now a visible
---     switch in the Extras tab (on by default).
---   * New: Auto 2x Speed Button - presses the round "x2" button when it pops up.
---   * Everything from v6 (treadmill detection, Auto Throw with cutscene removal, farm) is unchanged.
+-- Module-based Auto Throw update: retains the existing hub and farm.
+-- Perfect/Fast Throw use game modules when available. No old camera/GUI cutscene guard.
+-- Switch restoration is explicit; saved automation can sell or upgrade.
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -17,12 +18,23 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local VirtualUser = game:GetService("VirtualUser")
-local RunService = game:GetService("RunService")
 local GuiService = game:GetService("GuiService")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local env = (getgenv and getgenv()) or _G
+local deadline = os.clock() + 15
+while not LocalPlayer and os.clock() < deadline do
+    task.wait(0.1)
+    LocalPlayer = Players.LocalPlayer
+end
+if not LocalPlayer then error("LocalPlayer not ready. Join the game before running the script.") end
+local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 15)
+if not PlayerGui then error("PlayerGui not found after 15 seconds.") end
+print("[Brineland] PlayerGui ready; creating hub.")
+local env = _G
+if type(getgenv) == "function" then
+    local ok, value = pcall(getgenv)
+    if ok and type(value) == "table" then env = value end
+end
 
 -- Running the script again unloads the previous copy first
 if env.BrinelandThrowFoodUnload then pcall(env.BrinelandThrowFoodUnload) end
@@ -42,8 +54,6 @@ destroyIfExists("ThrowFoodHub")
 local CONFIG_FOLDER = "Brineland"
 local CONFIG_PATH = CONFIG_FOLDER .. "/ThrowFood.json"
 
-local TRAIN_POSITION = Vector3.new(-9, 5, -8)
-local THROW_POSITION = Vector3.new(7, 5, -34)
 local PHASE1_SECONDS = 600 -- training + upgrades
 local PHASE2_SECONDS = 300 -- throwing + equip best + sell all
 local TELEPORT_INTERVAL = 1 -- how often Auto Farm checks where you are
@@ -51,7 +61,7 @@ local TELEPORT_TOLERANCE = 4 -- studs (flat distance). Closer than this = no tel
 local REMOTE_TIMEOUT = 10 -- seconds before a RemoteFunction call counts as failed
 
 local EXPECTED_REMOTES = {
-	"Throw_Complete", "Training_Start", "Training_Stop",
+	"Training_Start", "Training_Stop",
 	"Plot_EquipBest", "Plot_SellAll", "Stand_Upgrade", "Shop_ClaimFree",
 }
 
@@ -59,8 +69,7 @@ local EXPECTED_REMOTES = {
 -- SETTINGS (one table drives defaults, limits, sliders and validation)
 -- ============================================================
 local SETTINGS_SCHEMA = {
-	PerfectValue     = { default = 20,     min = 1,    max = 100, step = 1 },
-	TapMethod        = { default = 1,      min = 1,    max = 3,   step = 1 },
+	FastSpeed        = { default = 3, min = 0.25, max = 10, step = 0.25 },
 	TrainDelay       = { default = 0.5,    min = 0.1,  max = 3,   step = 0.1 },
 	UpgradeDelay     = { default = 5,      min = 1,    max = 15,  step = 0.5 },
 	EquipDelay       = { default = 2,      min = 0.5,  max = 5,   step = 0.25 },
@@ -70,13 +79,15 @@ local SETTINGS_SCHEMA = {
 }
 
 local SAVED_KEYS = {
-	"PerfectValue", "TapMethod", "TrainDelay", "UpgradeDelay",
+	"FastSpeed", "TrainDelay", "UpgradeDelay",
 	"EquipDelay", "FreeDelay", "SellDelay", "FarmUpgradeDelay",
 }
 
 local Config = {
-	-- switches (never saved, loops always start OFF)
+	-- Dangerous automation starts off; saved switch states can be restored explicitly.
 	AutoThrow = false,
+	PerfectThrow = true,
+	FastThrow = true,
 	AutoTrain = false,
 	AutoEquipBest = false,
 	AutoSell = false,
@@ -92,7 +103,7 @@ for key, rule in pairs(SETTINGS_SCHEMA) do Config[key] = rule.default end
 -- every on/off feature (closing the window switches these off)
 local FEATURE_KEYS = {
 	"AutoThrow", "AutoTrain", "AutoEquipBest", "AutoSell", "AutoUpgradeBar", "AutoClaimFreeAnimal",
-	"AutoFarm", "AutoBoost",
+	"AutoFarm", "AutoBoost", "PerfectThrow", "FastThrow",
 }
 
 local alive = true
@@ -136,6 +147,8 @@ local function validateSetting(key, value)
 	return snapped
 end
 
+local savedSwitches = {}
+local suppressSwitchSave = false
 local saveQueued = false
 local function queueSave() end -- assigned below (needs saveSettings)
 
@@ -149,14 +162,16 @@ local function setSetting(key, value)
 end
 
 local function saveSettings()
-	if not (writefile and makefolder and isfolder) then return end
+	if not (writefile and makefolder and isfolder) then return false end
 	local data = {}
 	for _, key in ipairs(SAVED_KEYS) do data[key] = Config[key] end
+	data.Switches = savedSwitches
 	local ok, err = pcall(function()
 		if not isfolder(CONFIG_FOLDER) then makefolder(CONFIG_FOLDER) end
 		writefile(CONFIG_PATH, HttpService:JSONEncode(data))
 	end)
 	if not ok then log("Config save failed: " .. tostring(err)) end
+	return ok
 end
 
 queueSave = function()
@@ -186,7 +201,13 @@ local function loadSettings()
 		return
 	end
 
-	-- keys from older versions (PerfectThrow, ResolveOnly, ...) are simply ignored
+	if type(data.Switches) == "table" then
+		for _, key in ipairs(FEATURE_KEYS) do
+			if type(data.Switches[key]) == "boolean" then savedSwitches[key] = data.Switches[key] end
+		end
+		if type(data.Switches.AntiAFK) == "boolean" then savedSwitches.AntiAFK = data.Switches.AntiAFK end
+	end
+	-- Legacy numeric throw-bar settings are ignored by the new module-based throw.
 	for _, key in ipairs(SAVED_KEYS) do
 		local stored = data[key]
 		if stored ~= nil then
@@ -377,8 +398,11 @@ end
 -- Anti-AFK (the switch in the Extras tab sets Config.AntiAFK, it starts ON)
 track(LocalPlayer.Idled:Connect(function()
 	if not Config.AntiAFK then return end
-	VirtualUser:CaptureController()
-	VirtualUser:ClickButton2(Vector2.new())
+	local ok, err = pcall(function()
+		VirtualUser:CaptureController()
+		VirtualUser:ClickButton2(Vector2.new())
+	end)
+	if not ok then log("Anti-AFK input unavailable: " .. tostring(err)) end
 end))
 
 -- Moves you onto a spot only when you are away from it, so it never interrupts training or
@@ -497,7 +521,9 @@ local function standPositionOn(target)
 	local function consider(part)
 		if part:IsA("BasePart") then
 			local size = part.Size
-			local area = size.X * size.Y * size.Z / math.max(0.05, math.min(size.X, size.Y, size.Z))
+			-- Only consider reasonably horizontal, collidable top faces.
+			if not part.CanCollide or math.abs(part.CFrame.UpVector.Y) < 0.8 then return end
+			local area = size.X * size.Z
 			if not bestArea or area > bestArea then best, bestArea = part, area end
 		end
 	end
@@ -530,11 +556,8 @@ local function refreshTreadmill()
 
 	local best
 	for _, option in ipairs(options) do
-		local usable = option.score >= 0
-		local bestUsable = best and best.score >= 0
-		if not best
-			or (usable and not bestUsable)
-			or (usable == bestUsable and (option.score > best.score or (option.score == best.score and option.distance < best.distance))) then
+		-- Never intentionally choose a treadmill marked as another player's.
+		if option.score >= 0 and (not best or option.score > best.score or (option.score == best.score and option.distance < best.distance)) then
 			best = option
 		end
 	end
@@ -566,7 +589,7 @@ local function trainSpot()
 	if inst and inst:IsDescendantOf(workspace) and Treadmill.position then
 		return Treadmill.position, TRAIN_TOLERANCE
 	end
-	return TRAIN_POSITION, TELEPORT_TOLERANCE
+	return nil, TRAIN_TOLERANCE
 end
 
 -- ============================================================
@@ -632,7 +655,7 @@ local function trainStatusText()
 	if inst and inst:IsDescendantOf(workspace) then
 		table.insert(lines, "Treadmill: " .. Treadmill.how .. " - " .. clip(shortName(inst), 36))
 	else
-		table.insert(lines, "Treadmill: not found, using the default spot")
+		table.insert(lines, "No usable treadmill found; not teleporting.")
 	end
 	if Config.AutoTrain and Config.AutoThrow and not Config.AutoFarm then
 		table.insert(lines, "Staying put because Auto Throw is on.")
@@ -665,7 +688,7 @@ local function refreshTraining()
 					if movesForTraining() and sinceMove >= TELEPORT_INTERVAL then
 						sinceMove = 0
 						local position, tolerance = trainSpot()
-						if teleportTo(position, tolerance) then
+						if position and teleportTo(position, tolerance) then
 							-- give the server a moment to see the new position before Start
 							sinceStart = math.min(sinceStart, Config.TrainDelay - 0.3)
 						end
@@ -691,512 +714,242 @@ local function refreshTraining()
 end
 
 -- ============================================================
--- AUTO THROW
--- The script cannot see the game's code, so it reads the game's own throw bar:
---   1. finds the "TAP TO THROW!" text on screen
---   2. reads the "+N" number that follows the bar marker (+4, +10 ... +20)
---   3. taps the screen the moment N reaches Perfect Bar Value
---   4. cancels the cutscene: holds the camera where it was and ends the throw
+-- AUTO THROW: adapted from the supplied chukunhax module-based code.
+-- No screen taps, camera lock, GUI hiding, or Throw_Complete spam.
+-- It relies on this game's own ClientState / ThrowMeter / shared modules.
 -- ============================================================
-local ThrowUI = { label = nil, scannedAt = 0, numbers = {}, numbersAt = 0 }
-local ThrowInfo = {
-	found = false, value = nil, peak = 0, taps = 0, lastTapValue = nil, lastTapNote = "",
-	skipPressed = 0, hiddenGuis = 0, guiHiderOff = false,
-}
-local throwWatcherRunning = false
-local cameraHold = nil -- { type, subject, fov, cframe, rootPos, expires } while the cutscene lock is on
-local cameraBound = false
-local guiGuard = nil -- { baseline = { [ScreenGui] = true }, expires = time } after a tap
-local hiddenGuis = {} -- screens this script switched off because of a cutscene
-local ThrowSpot = nil -- where you stood the last time the throw bar was on screen
-local CAMERA_BIND = "BrinelandNoCutscene"
-local TAP_NAMES = { "screen tap", "game button", "virtual click" }
-
--- assigned once the window exists, so a tap is never aimed at this hub's own window or logo
-local hubCovers = function() return false end
+local hubCovers = function() return false end -- assigned when our window exists
+local function isShown(inst)
+    local node = inst
+    while node do
+        if node:IsA("GuiObject") and not node.Visible then return false end
+        if node:IsA("LayerCollector") and not node.Enabled then return false end
+        node = node.Parent
+    end
+    return true
+end
+local function tapWithInputManager(point)
+    local okService, manager = pcall(function() return game:GetService("VirtualInputManager") end)
+    if not (okService and manager) then return false end
+    return pcall(function()
+        if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
+            manager:SendTouchEvent(1, 0, point.X, point.Y)
+            task.wait(0.03)
+            manager:SendTouchEvent(1, 2, point.X, point.Y)
+        else
+            manager:SendMouseButtonEvent(point.X, point.Y, 0, true, game, 1)
+            task.wait(0.03)
+            manager:SendMouseButtonEvent(point.X, point.Y, 0, false, game, 1)
+        end
+    end)
+end
+-- A successful signal call only means an attempt; it does not confirm game action.
+local function pressButton(button)
+    if type(getconnections) == "function" then
+        for _, name in ipairs({ "Activated", "MouseButton1Click", "MouseButton1Down" }) do
+            local okList, list = pcall(getconnections, button[name])
+            if okList and type(list) == "table" then
+                for _, connection in ipairs(list) do
+                    if connection.Enabled ~= false then
+                        local ok = pcall(function() connection:Fire() end)
+                        if ok then return true end
+                    end
+                end
+            end
+        end
+    end
+    if type(firesignal) == "function" then return pcall(firesignal, button.Activated) end
+    return false
+end
+local function screenCenterOf(inst)
+    local center = inst.AbsolutePosition + inst.AbsoluteSize / 2
+    local gui = inst:FindFirstAncestorWhichIsA("ScreenGui")
+    if gui and not gui.IgnoreGuiInset then center = center + GuiService:GetGuiInset() end
+    return center
+end
 
 local function wantsThrowing()
-	if Config.AutoFarm then return Farm.phase == 2 end
-	return Config.AutoThrow
+    if Config.AutoFarm then return Farm.phase == 2 end
+    return Config.AutoThrow
 end
-
--- true when the object and every parent of it are visible
-local function isShown(inst)
-	local node = inst
-	while node do
-		if node:IsA("GuiObject") and not node.Visible then return false end
-		if node:IsA("LayerCollector") and not node.Enabled then return false end
-		node = node.Parent
-	end
-	return true
+local Throw = { loading = false, nextLoad = 0, note = "Off", mods = {}, originals = {}, writes = {}, errors = {} }
+local function tryModule(inst, label)
+    if not inst then Throw.errors[label] = "not found"; return nil end
+    if not inst:IsA("ModuleScript") then Throw.errors[label] = "not a ModuleScript"; return nil end
+    local ok, value = pcall(require, inst)
+    if ok and type(value) == "table" then Throw.errors[label] = nil; return value end
+    Throw.errors[label] = ok and "module did not return a table" or ("require: " .. clip(value, 100))
+    return nil
 end
-
-local function numberFromText(text)
-	local plain = string.gsub(text, "<[^>]+>", "")
-	return tonumber(string.match(plain, "^%s*%+%s*(%d+)%s*$")) -- exactly "+N"
+local function loadThrowModules()
+    if Throw.loading or os.clock() < Throw.nextLoad then return end
+    Throw.loading = true
+    Throw.nextLoad = os.clock() + 8
+    task.spawn(function()
+        local ok, err = pcall(function()
+            local scripts = LocalPlayer:FindFirstChild("PlayerScripts")
+            local client = scripts and scripts:FindFirstChild("Client")
+            local controllers = client and client:FindFirstChild("Controllers")
+            local shared = ReplicatedStorage:FindFirstChild("Shared")
+            local config = ReplicatedStorage:FindFirstChild("Config")
+            local modules = Throw.mods
+            modules.state = modules.state or tryModule(controllers and controllers:FindFirstChild("ClientState"), "ClientState")
+            modules.meter = modules.meter or tryModule(controllers and controllers:FindFirstChild("ThrowMeter"), "ThrowMeter")
+            modules.config = modules.config or tryModule(config and config:FindFirstChild("GameConfig"), "GameConfig")
+            modules.math = modules.math or tryModule(shared and shared:FindFirstChild("ThrowMeterMath"), "ThrowMeterMath")
+            modules.arc = modules.arc or tryModule(shared and shared:FindFirstChild("ProjectileMath"), "ProjectileMath")
+            modules.anim = modules.anim or tryModule(shared and shared:FindFirstChild("AnimationLibrary"), "AnimationLibrary")
+        end)
+        Throw.loading = false
+        if not ok then Throw.errors.loader = clip(err, 120); log("Auto Throw module loading error: " .. tostring(err)) else Throw.errors.loader = nil end
+    end)
 end
-
-local function findTapLabel()
-	ThrowUI.scannedAt = os.clock()
-	for _, inst in ipairs(PlayerGui:GetDescendants()) do
-		if inst:IsA("TextLabel") or inst:IsA("TextButton") then
-			if string.find(string.upper(inst.Text), "TAP TO THROW", 1, true) and not inst:FindFirstAncestor("ThrowFoodHub") then
-				return inst
-			end
-		end
-	end
-	return nil
+local function restoreThrowMods()
+    local m, o, w = Throw.mods, Throw.originals, Throw.writes
+    pcall(function() if m.arc and o.arc and m.arc.CreateArc == w.arc then m.arc.CreateArc = o.arc end end)
+    pcall(function() if m.anim and o.anim and m.anim.Play == w.anim then m.anim.Play = o.anim end end)
+    if o.meterSaved and m.meter then
+        pcall(function() if m.meter.TestAutoTap == w.meter then m.meter.TestAutoTap = o.meter end end)
+    end
+    if o.sequence then
+        for key, value in pairs(o.sequence) do
+            pcall(function() if o.sequenceTable[key] == w.sequence[key] then o.sequenceTable[key] = value end end)
+        end
+    end
+    Throw.originals, Throw.writes = {}, {}
 end
-
-local function collectNumberLabels(root)
-	local found = {}
-	for _, inst in ipairs(root:GetDescendants()) do
-		if inst:IsA("TextLabel") and numberFromText(inst.Text) and not inst:FindFirstAncestor("ThrowFoodHub") then
-			table.insert(found, inst)
-		end
-	end
-	return found
+local sequenceKeys = { "FadeIn", "FadeOut", "POVDuration", "RevealZoomNormal", "RevealZoomDramatic", "ShowTimeNormal", "ShowTimeShort", "SkipAfterRevealDelay" }
+local function installThrowMods()
+    local m, o, w = Throw.mods, Throw.originals, Throw.writes
+    if Config.PerfectThrow and m.meter and m.math and type(m.math.HalfPeriod) == "function" then
+        local ok, half = pcall(m.math.HalfPeriod)
+        if ok and type(half) == "number" and half == half and half > 0 then
+            if not o.meterSaved then o.meter, o.meterSaved = m.meter.TestAutoTap, true end
+            local value = half - (0.005 + math.random() * 0.002)
+            local changed = pcall(function() m.meter.TestAutoTap = value end)
+            if changed then w.meter = value; Throw.errors.meterWrite = nil
+            else Throw.errors.meterWrite = "ThrowMeter is not writable" end
+        else
+            Throw.errors.HalfPeriod = ok and "returned an invalid value" or clip(half, 100)
+        end
+    elseif o.meterSaved then
+        pcall(function() if m.meter.TestAutoTap == w.meter then m.meter.TestAutoTap = o.meter end end)
+        o.meterSaved, o.meter, w.meter = nil, nil, nil
+    end
+    if not Config.FastThrow then
+        -- Restore fast changes while leaving perfect mode on.
+        pcall(function() if m.arc and o.arc and m.arc.CreateArc == w.arc then m.arc.CreateArc = o.arc end end)
+        pcall(function() if m.anim and o.anim and m.anim.Play == w.anim then m.anim.Play = o.anim end end)
+        if o.sequence then
+            for key, value in pairs(o.sequence) do pcall(function() if o.sequenceTable[key] == w.sequence[key] then o.sequenceTable[key] = value end end) end
+        end
+        o.arc, o.anim, o.sequence, o.sequenceTable = nil, nil, nil, nil
+        w.arc, w.anim, w.sequence = nil, nil, nil
+        return
+    end
+    local function speed() return Config.FastSpeed * (0.94 + math.random() * 0.12) end
+    if m.arc and not o.arc and type(m.arc.CreateArc) == "function" then
+        local original = m.arc.CreateArc
+        local wrapper = function(a, b, time, ...)
+            if alive and wantsThrowing() and Config.FastThrow and type(time) == "number" then time = math.max(0.35, time / speed()) end
+            return original(a, b, time, ...)
+        end
+        local ok = pcall(function() m.arc.CreateArc = wrapper end)
+        if ok then o.arc, w.arc = original, wrapper; Throw.errors.arcWrite = nil else Throw.errors.arcWrite = "not writable" end
+    end
+    if m.anim and not o.anim and type(m.anim.Play) == "function" then
+        local original = m.anim.Play
+        local wrapper = function(rig, id, ...)
+            local tr = original(rig, id, ...)
+            if alive and wantsThrowing() and Config.FastThrow and tr and type(m.anim.GetThrowId) == "function" then
+                local ok, throwId = pcall(m.anim.GetThrowId)
+                if ok and throwId ~= nil and id == throwId then pcall(function() tr:AdjustSpeed(speed()) end) end
+            end
+            return tr
+        end
+        local ok = pcall(function() m.anim.Play = wrapper end)
+        if ok then o.anim, w.anim = original, wrapper; Throw.errors.animWrite = nil else Throw.errors.animWrite = "not writable" end
+    end
+    local sequence = m.config and m.config.Sequence
+    if type(sequence) == "table" then
+        if not o.sequence then
+            o.sequence, o.sequenceTable, w.sequence = {}, sequence, {}
+            for _, key in ipairs(sequenceKeys) do if type(sequence[key]) == "number" then o.sequence[key] = sequence[key] end end
+        end
+        if sequence == o.sequenceTable then
+            for key, base in pairs(o.sequence) do
+                if w.sequence[key] == nil or sequence[key] == w.sequence[key] then
+                    local value = math.max(0.08, base / Config.FastSpeed)
+                    local ok = pcall(function() sequence[key] = value end)
+                    if ok then w.sequence[key] = value end
+                end
+            end
+        end
+    end
 end
-
--- The visible "+N" label closest to the "TAP TO THROW!" text wins.
-local function readNumber(tapLabel)
-	local best, bestDistance
-	local center = tapLabel.AbsolutePosition + tapLabel.AbsoluteSize / 2
-	for _, inst in ipairs(ThrowUI.numbers) do
-		if inst:IsDescendantOf(PlayerGui) and isShown(inst) then
-			local value = numberFromText(inst.Text)
-			if value then
-				local distance = (inst.AbsolutePosition - center).Magnitude
-				if not bestDistance or distance < bestDistance then best, bestDistance = value, distance end
-			end
-		end
-	end
-	return best
+local function throwCharacter()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if root and root:IsA("BasePart") and hum and hum.Health > 0 then return root, hum end
 end
-
--- Returns the current bar number, or nil when the throw bar is not on screen.
-local function readBarValue()
-	local now = os.clock()
-	local label = ThrowUI.label
-
-	if not (label and label:IsDescendantOf(PlayerGui)) then
-		ThrowUI.label = nil
-		if now - ThrowUI.scannedAt < 0.5 then
-			ThrowInfo.found = false
-			return nil
-		end
-		label = findTapLabel()
-		ThrowUI.label = label
-		ThrowUI.numbers = {}
-		ThrowUI.numbersAt = 0
-		if not label then
-			ThrowInfo.found = false
-			return nil
-		end
-	end
-
-	ThrowInfo.found = true
-	if not isShown(label) then return nil end
-
-	local value = readNumber(label)
-	if value == nil and now - ThrowUI.numbersAt >= 0.5 then
-		ThrowUI.numbersAt = now
-		local root = label:FindFirstAncestorWhichIsA("ScreenGui")
-		ThrowUI.numbers = root and collectNumberLabels(root) or {}
-		if #ThrowUI.numbers == 0 then ThrowUI.numbers = collectNumberLabels(PlayerGui) end
-		value = readNumber(label)
-	end
-	return value
+local function throwTarget(root)
+    local area = workspace:FindFirstChild("StarterArea")
+    if not area then return nil end
+    local position, size
+    if area:IsA("BasePart") then position, size = area.Position, area.Size
+    elseif area:IsA("Model") then local cf; cf, size = area:GetBoundingBox(); position = cf.Position end
+    if not position or not size then return nil end
+    local line = area:FindFirstChild("CrossLine")
+    local z = line and line:IsA("BasePart") and line.Position.Z or (position.Z + size.Z / 2)
+    local halfX = math.max(0, size.X / 2 - 3)
+    local x = math.clamp(root.Position.X, position.X - halfX, position.X + halfX)
+    return Vector3.new(x, position.Y + size.Y / 2 + 3, z - 3)
 end
-
--- A spot on screen that is not under this hub's own window or logo.
-local function pickTapPoint()
-	local camera = workspace.CurrentCamera
-	local size = camera and camera.ViewportSize or Vector2.new(800, 400)
-	local candidates = {
-		Vector2.new(size.X * 0.5, size.Y * 0.5),
-		Vector2.new(size.X * 0.3, size.Y * 0.5),
-		Vector2.new(size.X * 0.7, size.Y * 0.5),
-		Vector2.new(size.X * 0.5, size.Y * 0.92),
-		Vector2.new(size.X * 0.5, size.Y * 0.12),
-	}
-	for _, point in ipairs(candidates) do
-		if not hubCovers(point) then return point end
-	end
-	return candidates[1]
-end
-
--- Tap method 1: real screen tap (touch on phones, mouse on PC)
-local function tapWithInputManager(point)
-	local okService, manager = pcall(function() return game:GetService("VirtualInputManager") end)
-	if not (okService and manager) then return false end
-	local ok = pcall(function()
-		if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
-			manager:SendTouchEvent(1, 0, point.X, point.Y)
-			task.wait(0.03)
-			manager:SendTouchEvent(1, 2, point.X, point.Y)
-		else
-			manager:SendMouseButtonEvent(point.X, point.Y, 0, true, game, 1)
-			task.wait(0.03)
-			manager:SendMouseButtonEvent(point.X, point.Y, 0, false, game, 1)
-		end
-	end)
-	return ok
-end
-
--- Tap method 2: press the game's own tap button directly
-local function findTapButton()
-	local label = ThrowUI.label
-	if not label then return nil end
-	if label:IsA("GuiButton") then return label end
-	local parentButton = label:FindFirstAncestorWhichIsA("GuiButton")
-	if parentButton then return parentButton end
-
-	local root = label:FindFirstAncestorWhichIsA("ScreenGui")
-	local best, bestArea
-	if root then
-		for _, inst in ipairs(root:GetDescendants()) do
-			if inst:IsA("GuiButton") and isShown(inst) then
-				local area = inst.AbsoluteSize.X * inst.AbsoluteSize.Y
-				if not bestArea or area > bestArea then best, bestArea = inst, area end
-			end
-		end
-	end
-	return best
-end
-
-local function pressButton(button)
-	if getconnections then
-		for _, name in ipairs({ "Activated", "MouseButton1Click", "MouseButton1Down" }) do
-			local okList, list = pcall(getconnections, button[name])
-			if okList and type(list) == "table" and #list > 0 then
-				for _, connection in ipairs(list) do pcall(function() connection:Fire() end) end
-				return true
-			end
-		end
-		return false
-	end
-	if firesignal then return (pcall(firesignal, button.Activated)) end
-	return false
-end
-
--- Tap method 3: virtual mouse click
-local function tapWithVirtualUser(point)
-	return (pcall(function()
-		VirtualUser:CaptureController()
-		VirtualUser:ClickButton1(point)
-	end))
-end
-
--- Uses the chosen Tap Method first, then the others if it cannot run. Returns the method used.
-local function tapForThrow()
-	local point = pickTapPoint()
-	for offset = 0, 2 do
-		local method = ((Config.TapMethod - 1 + offset) % 3) + 1
-		local worked = false
-		if method == 1 then
-			worked = tapWithInputManager(point)
-		elseif method == 2 then
-			local button = findTapButton()
-			worked = button ~= nil and pressButton(button)
-		else
-			worked = tapWithVirtualUser(point)
-		end
-		if worked then return TAP_NAMES[method] end
-	end
-	return nil
-end
-
--- Cutscene cancel, part 1: lock the camera to the view the throw started with. The lock stays
--- on for as long as Auto Throw keeps throwing, so the throw cutscene never shows. The camera is
--- set to Scriptable and re-applied after every other camera step, every frame.
-local function captureCamera()
-	local camera = workspace.CurrentCamera
-	if not camera then return nil end
-	local char = LocalPlayer.Character
-	local root = char and char:FindFirstChild("HumanoidRootPart")
-	return {
-		type = camera.CameraType,
-		subject = camera.CameraSubject,
-		fov = camera.FieldOfView,
-		cframe = camera.CFrame,
-		rootPos = root and root.Position or nil,
-		expires = os.clock() + 15, -- renewed by every tap; ends the lock if throwing stops
-	}
-end
-
-local function releaseCamera()
-	local hold = cameraHold
-	cameraHold = nil
-	if cameraBound then
-		cameraBound = false
-		pcall(function() RunService:UnbindFromRenderStep(CAMERA_BIND) end)
-	end
-	local camera = workspace.CurrentCamera
-	if hold and camera then
-		camera.CameraType = hold.type
-		if hold.subject then camera.CameraSubject = hold.subject end
-	end
-end
-
-local function holdCamera(state)
-	cameraHold = state
-	if cameraBound then return end
-	cameraBound = true
-	RunService:BindToRenderStep(CAMERA_BIND, Enum.RenderPriority.Last.Value + 100, function()
-		local hold = cameraHold
-		local camera = workspace.CurrentCamera
-		if not hold or not camera or not alive or os.clock() > hold.expires then
-			releaseCamera()
-			return
-		end
-		if hold.rootPos then
-			local char = LocalPlayer.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-			if not root or (root.Position - hold.rootPos).Magnitude > 8 then
-				releaseCamera() -- you walked away or respawned: the camera is yours again
-				return
-			end
-		end
-		camera.CameraType = Enum.CameraType.Scriptable
-		camera.FieldOfView = hold.fov
-		camera.CFrame = hold.cframe
-	end)
-end
-
--- Cutscene cancel, part 2: switch off screens that only appeared because of the throw.
--- Only screens that were NOT showing at the moment of the tap are touched, never the throw bar's
--- own screens. If the bar fails to come back, everything is put back and hiding is turned off.
-local function snapshotGuis()
-	local baseline = {}
-	for _, gui in ipairs(PlayerGui:GetChildren()) do
-		if gui:IsA("ScreenGui") and gui.Enabled then baseline[gui] = true end
-	end
-	return baseline
-end
-
-local function isBarGui(gui)
-	local root = ThrowUI.label and ThrowUI.label:FindFirstAncestorWhichIsA("ScreenGui")
-	if gui == root then return true end
-	for _, label in ipairs(ThrowUI.numbers) do
-		if label:IsDescendantOf(gui) then return true end
-	end
-	local lower = string.lower(gui.Name)
-	if string.find(lower, "throw", 1, true)
-		and not (string.find(lower, "cutscene", 1, true) or string.find(lower, "cinematic", 1, true)) then
-		return true
-	end
-	return false
-end
-
-local function hideNewGuis()
-	local guard = guiGuard
-	if not guard or ThrowInfo.guiHiderOff then return end
-	if os.clock() > guard.expires then
-		guiGuard = nil
-		return
-	end
-	for _, gui in ipairs(PlayerGui:GetChildren()) do
-		if gui:IsA("ScreenGui") and gui.Enabled and not guard.baseline[gui]
-			and gui.Name ~= "ThrowFoodHub" and not isBarGui(gui) then
-			gui.Enabled = false
-			hiddenGuis[gui] = true
-			ThrowInfo.hiddenGuis = ThrowInfo.hiddenGuis + 1
-		end
-	end
-end
-
-local function restoreHiddenGuis()
-	for gui in pairs(hiddenGuis) do
-		if gui.Parent then gui.Enabled = true end
-		hiddenGuis[gui] = nil
-	end
-end
-
--- Cutscene cancel, part 3: press a visible "Skip" button if the game offers one.
-local function screenCenterOf(inst)
-	local center = inst.AbsolutePosition + inst.AbsoluteSize / 2
-	local gui = inst:FindFirstAncestorWhichIsA("ScreenGui")
-	if gui and not gui.IgnoreGuiInset then center = center + GuiService:GetGuiInset() end
-	return center
-end
-
-local function pressSkipButton()
-	for _, inst in ipairs(PlayerGui:GetDescendants()) do
-		if inst:IsA("GuiButton") and isShown(inst) and not inst:FindFirstAncestor("ThrowFoodHub") then
-			local text = inst:IsA("TextButton") and inst.Text or ""
-			if text == "" then
-				for _, child in ipairs(inst:GetChildren()) do
-					if child:IsA("TextLabel") then
-						text = child.Text
-						break
-					end
-				end
-			end
-			local plain = string.gsub(text, "<[^>]+>", "")
-			if string.match(string.upper(plain), "^%s*SKIP") then
-				if not pressButton(inst) then tapWithInputManager(screenCenterOf(inst)) end
-				return true
-			end
-		end
-	end
-	return false
-end
-
--- Cutscene cancel, part 4: end the throw on the server right away.
-local function skipCutscene()
-	task.wait(0.15) -- let the game's own Throw_Resolve go out first
-	callRemote("Throw_Complete")
-	for _ = 1, 6 do
-		task.wait(0.4)
-		if not alive then break end
-		if pressSkipButton() then
-			ThrowInfo.skipPressed = ThrowInfo.skipPressed + 1
-			break
-		end
-	end
-end
-
--- Remember where you stand while the throw bar is on screen (Auto Farm goes back there).
--- To be safe it only counts after the bar has stayed up for 1.5 seconds while you stood still
--- (a bar that lingers for a moment after a teleport must never become the "throw spot").
-local spotCandidate = nil -- { position, since }
-
-local function rootPosition()
-	local char = LocalPlayer.Character
-	local root = char and char:FindFirstChild("HumanoidRootPart")
-	return root and root.Position or nil
-end
-
-local function observeThrowSpot(barVisible)
-	local position = barVisible and rootPosition() or nil
-	if not position then
-		spotCandidate = nil
-		return
-	end
-	local now = os.clock()
-	if not spotCandidate or (position - spotCandidate.position).Magnitude > 3 then
-		spotCandidate = { position = position, since = now }
-	elseif now - spotCandidate.since >= 1.5 then
-		ThrowSpot = spotCandidate.position
-	end
-end
-
-local function throwSpotPosition()
-	return ThrowSpot or THROW_POSITION
-end
-
--- Used when you switch Auto Farm on yourself: if the bar is up right now, you are at the spot.
-local function learnThrowSpotIfBarVisible()
-	readBarValue()
-	local label = ThrowUI.label
-	if label and label:IsDescendantOf(PlayerGui) and isShown(label) then
-		ThrowSpot = rootPosition() or ThrowSpot
-	end
-end
-
--- One watcher runs while throwing is wanted (Auto Throw, or Auto Farm in Phase 2).
--- Safe to call as often as you like: does nothing if the watcher is already running.
 local function refreshThrowing()
-	if throwWatcherRunning or not wantsThrowing() then return end
-	throwWatcherRunning = true
-
-	task.spawn(function()
-		local ok, err = pcall(function()
-			local armed = true
-			local lastTapAt = 0
-			local barMissingSince = nil
-
-			while alive and wantsThrowing() do
-				RunService.RenderStepped:Wait()
-
-				local value = readBarValue()
-				ThrowInfo.value = value
-				if value and value > ThrowInfo.peak then ThrowInfo.peak = value end
-
-				hideNewGuis()
-
-				if value == nil then
-					armed = true
-					observeThrowSpot(false)
-					barMissingSince = barMissingSince or os.clock()
-					-- the bar did not come back after something was hidden: put it all back
-					if next(hiddenGuis) and not ThrowInfo.guiHiderOff and os.clock() - barMissingSince > 10 then
-						restoreHiddenGuis()
-						ThrowInfo.guiHiderOff = true
-						guiGuard = nil
-					end
-				else
-					barMissingSince = nil
-					if next(hiddenGuis) and os.clock() - lastTapAt > 1.5 then table.clear(hiddenGuis) end
-					observeThrowSpot(true)
-
-					if value < Config.PerfectValue then
-						armed = true
-					elseif armed then
-						armed = false
-						lastTapAt = os.clock()
-
-						-- lock the camera to the throw view BEFORE the tap, keep it locked afterwards
-						if cameraHold then
-							cameraHold.expires = os.clock() + 15
-						else
-							local state = captureCamera()
-							if state then holdCamera(state) end
-						end
-						if not ThrowInfo.guiHiderOff then
-							guiGuard = { baseline = snapshotGuis(), expires = os.clock() + 6 }
-						end
-
-						task.spawn(function()
-							local method = tapForThrow()
-							ThrowInfo.taps = ThrowInfo.taps + 1
-							ThrowInfo.lastTapValue = value
-							ThrowInfo.lastTapNote = method or "no tap method could run"
-							skipCutscene()
-						end)
-					elseif os.clock() - lastTapAt > 2 then
-						armed = true -- the tap did not register, try again
-					end
-				end
-			end
-		end)
-		throwWatcherRunning = false
-		ThrowInfo.value = nil
-		releaseCamera() -- throwing stopped: the camera is the game's again
-		if not ok then log("Auto Throw error: " .. tostring(err)) end
-	end)
+    if not wantsThrowing() then restoreThrowMods(); Throw.note = "Off" end
 end
-
+task.spawn(function()
+    while alive do
+        if wantsThrowing() then
+            local ok, err = pcall(function()
+                loadThrowModules()
+                local m = Throw.mods
+                Throw.note = "Waiting for game modules"
+                if m.meter and m.math then Throw.note = "Module ready (server result not confirmed)" end
+                installThrowMods()
+                local root, hum = throwCharacter()
+                if not root then Throw.note = "Waiting for character"; return end
+                local state = m.state
+                if state and (rawget(state, "Busy") == true or rawget(state, "OfflineOpen") == true) then Throw.note = "Game is busy"; return end
+                if root.Anchored then Throw.note = "Character is anchored"; return end
+                local target = throwTarget(root)
+                if not target then Throw.note = "StarterArea not found"; return end
+                local flat = Vector3.new(root.Position.X - target.X, 0, root.Position.Z - target.Z).Magnitude
+                if flat > 1.5 then hum:MoveTo(target); Throw.note = "Walking to throw area" end
+            end)
+            if not ok then Throw.note = "Error; see console"; log("Auto Throw error: " .. tostring(err)) end
+        else
+            refreshThrowing()
+        end
+        task.wait(0.35)
+    end
+end)
 local function throwStatusText()
-	local lines = {}
-	if not wantsThrowing() then
-		table.insert(lines, "Auto Throw is off.")
-	elseif not ThrowInfo.found then
-		table.insert(lines, "Looking for the throw bar... stand at the throw spot.")
-	elseif ThrowInfo.value == nil then
-		table.insert(lines, "Throw bar not on screen right now.")
-	else
-		table.insert(lines, "Bar: +" .. ThrowInfo.value .. "   (taps at +" .. Config.PerfectValue .. ")")
-	end
-	if ThrowInfo.peak > 0 then
-		table.insert(lines, "Highest bar value seen: +" .. ThrowInfo.peak)
-	end
-	if ThrowInfo.taps > 0 then
-		table.insert(lines, "Taps: " .. ThrowInfo.taps .. " (last at +" .. tostring(ThrowInfo.lastTapValue) .. ", " .. ThrowInfo.lastTapNote .. ")")
-		table.insert(lines, "Cutscene: camera " .. (cameraHold and "locked" or "free")
-			.. ", screens hidden " .. ThrowInfo.hiddenGuis .. (ThrowInfo.guiHiderOff and " (off)" or "")
-			.. ", Skip " .. ThrowInfo.skipPressed .. "x")
-		table.insert(lines, "Throw_Complete: " .. (RemoteLast.Throw_Complete or "n/a"))
-	end
-	return table.concat(lines, "\n")
+    if not wantsThrowing() then return "Auto Throw is off.\nPerfect and Fast options apply when throwing is active." end
+    local m = Throw.mods
+    local meter = (m.meter and m.math and type(m.math.HalfPeriod) == "function") and "loaded" or "missing/unavailable"
+    local detail = Throw.errors.meterWrite or Throw.errors.HalfPeriod or Throw.errors.ThrowMeter or Throw.errors.ThrowMeterMath
+    return "Auto Throw: " .. Throw.note .. "\nMeter: " .. meter
+        .. " | Fast modules: " .. ((m.arc or m.anim or m.config) and "loaded" or "unavailable")
+        .. (detail and ("\nDetails: " .. tostring(detail)) or "")
 end
 
 -- ============================================================
 -- AUTO 2x SPEED BUTTON
 -- A round "x2" button pops up now and then; tapping it gives 2x speed for a while.
 -- This finds it (a visible button with "x2" written on it) and presses it for you.
--- Anything inside a shop / gamepass / purchase screen is never touched.
+-- Shop/purchase name and text checks reduce false positives but cannot prove safety.
 -- ============================================================
 local BoostInfo = { found = false, presses = 0, note = "waiting for the button to appear" }
 local boostPressedAt = setmetatable({}, { __mode = "k" }) -- [button] = time of the last press
@@ -1213,8 +966,17 @@ local function insideBlockedScreen(inst)
 	local node = inst
 	while node and node ~= PlayerGui do
 		local lower = string.lower(node.Name)
+		local text = (node:IsA("TextLabel") or node:IsA("TextButton")) and string.lower(node.Text) or ""
 		for _, word in ipairs(BOOST_BLOCKED_WORDS) do
-			if string.find(lower, word, 1, true) then return true end
+			if string.find(lower, word, 1, true) or string.find(text, word, 1, true) then return true end
+		end
+		if node:IsA("GuiButton") then
+			for _, child in ipairs(node:GetDescendants()) do
+				if child:IsA("TextLabel") or child:IsA("TextButton") then
+					local childText = child.Text:lower()
+					for _, word in ipairs(BOOST_BLOCKED_WORDS) do if childText:find(word, 1, true) then return true end end
+				end
+			end
 		end
 		node = node.Parent
 	end
@@ -1224,24 +986,28 @@ end
 local function usableBoostButton(button)
 	if not (button and isShown(button)) then return false end
 	local size = button.AbsoluteSize
-	if size.X > 300 or size.Y > 300 then return false end -- a floating button, not a big panel
-	return not insideBlockedScreen(button)
+	if size.X > 300 or size.Y > 300 then return false end
+	if insideBlockedScreen(button) then return false end
+	-- Require a speed/boost hint close to the button, not just unrelated "x2" text.
+	local node, depth, relevant = button, 0, false
+	while node and node ~= PlayerGui and depth < 4 do
+		local name = node.Name:lower()
+		if name:find("speed", 1, true) or name:find("boost", 1, true) then relevant = true end
+		if node:IsA("TextLabel") or node:IsA("TextButton") then
+			local text = node.Text:lower()
+			if text:find("speed", 1, true) or text:find("boost", 1, true) then relevant = true end
+		end
+		node, depth = node.Parent, depth + 1
+	end
+	return relevant
 end
 
 local function findBoostButton()
 	for _, inst in ipairs(PlayerGui:GetDescendants()) do
 		if (inst:IsA("TextLabel") or inst:IsA("TextButton")) and isBoostText(inst.Text)
 			and isShown(inst) and not inst:FindFirstAncestor("ThrowFoodHub") then
-			-- the clickable thing: the text itself, the button it sits inside, or a button next to it
+			-- Text must belong to the clickable button, never an arbitrary sibling.
 			local button = inst:IsA("GuiButton") and inst or inst:FindFirstAncestorWhichIsA("GuiButton")
-			if not button and inst.Parent then
-				for _, sibling in ipairs(inst.Parent:GetChildren()) do
-					if sibling:IsA("GuiButton") then
-						button = sibling
-						break
-					end
-				end
-			end
 			if usableBoostButton(button) then return button end
 		end
 	end
@@ -1252,14 +1018,12 @@ local function pressBoost()
 	local button = findBoostButton()
 	BoostInfo.found = button ~= nil
 	if not button then
-		BoostInfo.note = "waiting for the button to appear"
+		BoostInfo.note = "waiting for a recognizable speed button"
 		return
 	end
 
 	local last = boostPressedAt[button]
 	if last and os.clock() - last < 8 then return end -- just pressed it, give it time to go away
-	boostPressedAt[button] = os.clock()
-
 	local method
 	if pressButton(button) then
 		method = "button signal"
@@ -1273,8 +1037,9 @@ local function pressBoost()
 	end
 
 	if method then
+		boostPressedAt[button] = os.clock()
 		BoostInfo.presses = BoostInfo.presses + 1
-		BoostInfo.note = "pressed it (" .. method .. ")"
+		BoostInfo.note = "attempted (" .. method .. "); not confirmed"
 	else
 		BoostInfo.note = "found it but could not press it"
 	end
@@ -1282,7 +1047,7 @@ end
 
 local function boostStatusText()
 	if not Config.AutoBoost then return "Auto 2x Speed is off." end
-	return "2x speed button: " .. BoostInfo.note .. "\nPressed so far: " .. BoostInfo.presses
+	return "2x speed button: " .. BoostInfo.note .. "\nAttempts: " .. BoostInfo.presses
 end
 
 -- ============================================================
@@ -1299,7 +1064,7 @@ local function newPhaseTimers(phase)
 	if phase == 1 then
 		return { upgrade = math.huge }
 	end
-	return { teleport = math.huge, equip = math.huge, sell = math.huge }
+	return { equip = math.huge, sell = math.huge }
 end
 
 local function advanceTimers(timers, dt)
@@ -1356,9 +1121,7 @@ local function farmLoop(token)
 		else
 			advanceTimers(timers, dt)
 
-			if due(timers, "teleport", TELEPORT_INTERVAL) then teleportTo(throwSpotPosition()) end
-
-			refreshThrowing() -- keeps the Auto Throw watcher alive (no-op if it is already running)
+			refreshThrowing() -- module-based throw walks towards StarterArea
 
 			if due(timers, "equip", Config.EquipDelay) then callRemote("Plot_EquipBest") end
 			if stale() then return end
@@ -1396,7 +1159,6 @@ local function startFarm()
 	Tokens.AutoFarm = token
 	Config.AutoFarm = true
 	notify("Auto Farming Resumed", farmStatusText(), 3)
-	pcall(learnThrowSpotIfBarVisible) -- if you are standing at the throw spot right now, remember it
 	refreshTraining()
 	refreshThrowing()
 	task.spawn(function()
@@ -1407,23 +1169,24 @@ end
 
 local function stopFarm()
 	stopLoop("AutoFarm") -- the training heartbeat notices and sends the final Stop
+	refreshThrowing()
+	refreshTraining()
 	notify("Auto Farming Paused", farmStatusText(), 3)
 end
 
 -- ============================================================
--- GUI (blue / purple theme)
+-- GUI: same monochrome style as Brineland main.lua
 -- ============================================================
 local THEME = {
-	Panel = Color3.fromRGB(16, 12, 28),
-	Top = Color3.fromRGB(25, 18, 45),
-	Row = Color3.fromRGB(24, 16, 45),
-	Tab = Color3.fromRGB(30, 20, 55),
-	TabText = Color3.fromRGB(170, 160, 210),
-	Accent = Color3.fromRGB(0, 229, 255),
-	TabOn = Color3.fromRGB(0, 160, 240),
-	Off = Color3.fromRGB(45, 30, 75),
-	Text = Color3.fromRGB(240, 240, 255),
-	Purple = Color3.fromRGB(120, 50, 255),
+    Panel = Color3.fromRGB(10, 10, 12),
+    Top = Color3.fromRGB(24, 24, 28),
+    Row = Color3.fromRGB(24, 24, 28),
+    Tab = Color3.fromRGB(24, 24, 28),
+    TabText = Color3.fromRGB(180, 180, 190),
+    Accent = Color3.fromRGB(255, 255, 255),
+    TabOn = Color3.fromRGB(255, 255, 255),
+    Off = Color3.fromRGB(46, 46, 54),
+    Text = Color3.fromRGB(255, 255, 255),
 }
 
 local function make(class, props, parent)
@@ -1443,8 +1206,17 @@ local ScreenGui = make("ScreenGui", {
 	IgnoreGuiInset = true,
 	DisplayOrder = 999,
 })
-pcall(function() ScreenGui.Parent = (gethui and gethui()) or CoreGui end)
-if not ScreenGui.Parent then ScreenGui.Parent = PlayerGui end
+-- Match main.lua: use PlayerGui first; avoid a hidden/inaccessible executor container.
+local okGui, guiError = pcall(function() ScreenGui.Parent = PlayerGui end)
+if not okGui or not ScreenGui.Parent then
+    if type(gethui) == "function" then
+        pcall(function() ScreenGui.Parent = gethui() end)
+    end
+    if not ScreenGui.Parent then pcall(function() ScreenGui.Parent = CoreGui end) end
+end
+if not ScreenGui.Parent then error("Could not display Throw Food GUI: " .. tostring(guiError)) end
+ScreenGui.Enabled = true
+print("[Brineland] GUI parented to " .. ScreenGui.Parent.ClassName)
 
 -- Drag support for any frame (mouse and touch). Returns a function telling if the last press was a drag.
 local function makeDraggable(handle, target)
@@ -1472,141 +1244,38 @@ local function makeDraggable(handle, target)
 	return function() return moved > 8 end
 end
 
--- Main window (scales to the screen, good for mobile)
+-- Main window, top bar, and collapse button like main.lua. No extra pill.
+local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+local HUB_WIDTH = math.max(250, math.min(420, vp.X - 24))
+local HUB_HEIGHT = math.max(190, math.min(315, vp.Y - 65))
 local MainFrame = make("Frame", {
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.fromScale(0.5, 0.8),
-	BackgroundColor3 = THEME.Panel,
-	BackgroundTransparency = 0.05,
-	BorderSizePixel = 0,
-	Active = true,
-	ClipsDescendants = true,
+    Position = UDim2.fromOffset(16, 48), Size = UDim2.fromOffset(HUB_WIDTH, HUB_HEIGHT),
+    BackgroundColor3 = THEME.Panel, BackgroundTransparency = 0.06,
+    BorderSizePixel = 0, Active = true, ClipsDescendants = true,
 }, ScreenGui)
-make("UISizeConstraint", { MinSize = Vector2.new(330, 240), MaxSize = Vector2.new(420, 420) }, MainFrame)
-round(MainFrame, UDim.new(0, 10))
-make("UIStroke", { Color = Color3.fromRGB(90, 40, 220), Thickness = 1.5 }, MainFrame)
-
-local TopBar = make("Frame", {
-	Size = UDim2.new(1, 0, 0, 38),
-	BackgroundColor3 = THEME.Top,
-	BorderSizePixel = 0,
-}, MainFrame)
-round(TopBar, UDim.new(0, 10))
-make("Frame", {
-	Size = UDim2.new(1, 0, 0.5, 0),
-	Position = UDim2.new(0, 0, 0.5, 0),
-	BackgroundColor3 = THEME.Top,
-	BorderSizePixel = 0,
-}, TopBar)
-
-make("TextLabel", {
-	Size = UDim2.new(1, -76, 1, 0),
-	Position = UDim2.new(0, 12, 0, 0),
-	BackgroundTransparency = 1,
-	Text = '<b>BRINELAND</b> <font color="#00E5FF">| THROW FOOD</font>',
-	TextColor3 = Color3.fromRGB(255, 255, 255),
-	Font = Enum.Font.GothamBold,
-	TextSize = 12,
-	RichText = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-}, TopBar)
-
-local MinimizeBtn = make("TextButton", {
-	Size = UDim2.fromOffset(26, 26),
-	Position = UDim2.new(1, -62, 0.5, -13),
-	BackgroundColor3 = Color3.fromRGB(45, 30, 80),
-	Text = "-",
-	TextColor3 = THEME.Accent,
-	Font = Enum.Font.GothamBold,
-	TextSize = 16,
-}, TopBar)
-round(MinimizeBtn, UDim.new(0, 6))
-
-local CloseBtn = make("TextButton", {
-	Size = UDim2.fromOffset(26, 26),
-	Position = UDim2.new(1, -30, 0.5, -13),
-	BackgroundColor3 = Color3.fromRGB(200, 35, 65),
-	Text = "X",
-	TextColor3 = Color3.fromRGB(255, 255, 255),
-	Font = Enum.Font.GothamBold,
-	TextSize = 12,
-}, TopBar)
-round(CloseBtn, UDim.new(0, 6))
-
+round(MainFrame, UDim.new(0, 12))
+make("UIStroke", {Color = THEME.Text, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, MainFrame)
+local TopBar = make("Frame", {Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = THEME.Top, BackgroundTransparency = 0.1, BorderSizePixel = 0, Active = true}, MainFrame)
+round(TopBar, UDim.new(0, 12))
+make("TextLabel", {Size = UDim2.new(1, -130, 1, 0), Position = UDim2.fromOffset(12, 0),
+    BackgroundTransparency = 1, Text = "Brineland", TextColor3 = THEME.Text,
+    Font = Enum.Font.Fondamento, TextSize = 19, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
+local HomeBtn = make("TextButton", {Size = UDim2.fromOffset(50, 24), Position = UDim2.new(1, -120, 0.5, -12),
+    BackgroundColor3 = THEME.Accent, Text = "Home", TextColor3 = THEME.Panel, Font = Enum.Font.GothamBold, TextSize = 10}, TopBar)
+round(HomeBtn, UDim.new(1, 0))
+local MinimizeBtn = make("TextButton", {Size = UDim2.fromOffset(26, 26), Position = UDim2.new(1, -62, 0.5, -13),
+    BackgroundColor3 = THEME.Off, Text = "▼", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 10}, TopBar)
+round(MinimizeBtn, UDim.new(1, 0))
+make("UIStroke", {Color = THEME.Text, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, MinimizeBtn)
+local CloseBtn = make("TextButton", {Size = UDim2.fromOffset(26, 26), Position = UDim2.new(1, -32, 0.5, -13),
+    BackgroundColor3 = THEME.Off, Text = "X", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 11}, TopBar)
+round(CloseBtn, UDim.new(1, 0))
+make("UIStroke", {Color = THEME.Text, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, CloseBtn)
 makeDraggable(TopBar, MainFrame)
-
--- Brineland pill (top of the screen, same look as the old hub): title, a "+" button that shows /
--- hides the window, and an "X" button that closes the script. Drag the pill to move it.
-local HubPill = make("Frame", {
-	Name = "ThrowFoodPill",
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 4),
-	Size = UDim2.new(0.44, 0, 0, 40),
-	BackgroundColor3 = Color3.fromRGB(18, 12, 40),
-	BorderSizePixel = 0,
-	Active = true,
-}, ScreenGui)
-make("UISizeConstraint", { MinSize = Vector2.new(290, 36), MaxSize = Vector2.new(420, 44) }, HubPill)
-round(HubPill, UDim.new(1, 0)) -- fully rounded = oval
-make("UIStroke", { Color = Color3.fromRGB(110, 55, 255), Thickness = 2 }, HubPill)
-
-local pillTitle = make("TextLabel", {
-	Size = UDim2.new(1, -96, 1, 0),
-	Position = UDim2.new(0, 20, 0, 0),
-	BackgroundTransparency = 1,
-	Text = '<b>BRINELAND</b> <font color="#00E5FF">THROW FOOD HUB</font>',
-	TextColor3 = Color3.fromRGB(255, 255, 255),
-	Font = Enum.Font.GothamBold,
-	TextScaled = true,
-	RichText = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-}, HubPill)
-make("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 8 }, pillTitle)
-
-local PlusBtn = make("TextButton", {
-	Size = UDim2.fromOffset(30, 30),
-	Position = UDim2.new(1, -74, 0.5, -15),
-	BackgroundColor3 = Color3.fromRGB(62, 36, 150),
-	Text = "+",
-	TextColor3 = THEME.Accent,
-	Font = Enum.Font.GothamBold,
-	TextSize = 18,
-	AutoButtonColor = true,
-}, HubPill)
-round(PlusBtn, UDim.new(0, 8))
-
-local PillCloseBtn = make("TextButton", {
-	Size = UDim2.fromOffset(30, 30),
-	Position = UDim2.new(1, -38, 0.5, -15),
-	BackgroundColor3 = Color3.fromRGB(205, 30, 62),
-	Text = "X",
-	TextColor3 = Color3.fromRGB(255, 255, 255),
-	Font = Enum.Font.GothamBold,
-	TextSize = 13,
-	AutoButtonColor = true,
-}, HubPill)
-round(PillCloseBtn, UDim.new(0, 8))
-
-makeDraggable(HubPill, HubPill)
-
-local function setWindowVisible(visible)
-	MainFrame.Visible = visible
-	HubPill.Visible = not visible -- the pill is only there while the window is hidden
-end
-setWindowVisible(true)
-PlusBtn.MouseButton1Click:Connect(function() setWindowVisible(true) end)
-MinimizeBtn.MouseButton1Click:Connect(function() setWindowVisible(false) end)
-
--- Auto Throw uses this so it never taps on top of this hub's own window or pill.
 hubCovers = function(point)
-	local function inside(frame)
-		if not (frame and frame.Visible) then return false end
-		local position, size = frame.AbsolutePosition, frame.AbsoluteSize
-		return point.X >= position.X - 8 and point.X <= position.X + size.X + 8
-			and point.Y >= position.Y - 8 and point.Y <= position.Y + size.Y + 8
-	end
-	return inside(MainFrame) or inside(HubPill)
+    if not MainFrame.Visible then return false end
+    local p, size = MainFrame.AbsolutePosition, MainFrame.AbsoluteSize
+    return point.X >= p.X - 8 and point.X <= p.X + size.X + 8 and point.Y >= p.Y - 8 and point.Y <= p.Y + size.Y + 8
 end
 
 -- Toast notifications
@@ -1619,7 +1288,7 @@ notify = function(title, message, duration)
 		Position = UDim2.new(0.5, 0, 1, -14),
 		Size = UDim2.fromOffset(0, 0),
 		AutomaticSize = Enum.AutomaticSize.XY,
-		BackgroundColor3 = Color3.fromRGB(10, 8, 28),
+		BackgroundColor3 = THEME.Panel,
 		BorderSizePixel = 0,
 	}, ScreenGui)
 	round(toast, UDim.new(0, 10))
@@ -1637,7 +1306,7 @@ notify = function(title, message, duration)
 		Font = Enum.Font.GothamMedium,
 		TextSize = 12,
 		TextColor3 = THEME.Text,
-		Text = '<font color="#00E5FF"><b>' .. tostring(title) .. "</b></font>\n" .. tostring(message),
+		Text = '<font color="#FFFFFF"><b>' .. tostring(title) .. "</b></font>\n" .. tostring(message),
 	}, toast)
 	Toast = toast
 	task.delay(duration or 4, function()
@@ -1665,15 +1334,32 @@ make("UIListLayout", {
 
 local TabFrames = {}
 local TabOrder = {}
-
+local activeTab, collapsed = "Home", false
 local function selectTab(name)
-	for tabName, data in pairs(TabFrames) do
-		local on = tabName == name
-		data.Container.Visible = on
-		data.Button.BackgroundColor3 = on and THEME.TabOn or THEME.Tab
-		data.Button.TextColor3 = on and Color3.fromRGB(255, 255, 255) or THEME.TabText
-	end
+    activeTab = name
+    for tabName, data in pairs(TabFrames) do
+        local on = tabName == name
+        data.Container.Visible = on and not collapsed
+        if data.Button then
+            data.Button.BackgroundColor3 = on and THEME.TabOn or THEME.Tab
+            data.Button.TextColor3 = on and THEME.Panel or THEME.TabText
+        end
+    end
+    HomeBtn.BackgroundColor3 = name == "Home" and THEME.Text or THEME.Off
+    HomeBtn.TextColor3 = name == "Home" and THEME.Panel or THEME.Text
 end
+local function setCollapsed(on)
+    collapsed = on
+    TabBar.Visible = not on
+    MainFrame.Size = UDim2.fromOffset(HUB_WIDTH, on and 40 or HUB_HEIGHT)
+    MinimizeBtn.Text = on and "▲" or "▼"
+    selectTab(activeTab)
+end
+MinimizeBtn.MouseButton1Click:Connect(function() setCollapsed(not collapsed) end)
+HomeBtn.MouseButton1Click:Connect(function() if collapsed then setCollapsed(false) end; selectTab("Home") end)
+track(UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.RightShift then MainFrame.Visible = not MainFrame.Visible end
+end))
 
 local function CreateTab(tabName)
 	local tabBtn = make("TextButton", {
@@ -1686,7 +1372,8 @@ local function CreateTab(tabName)
 		TextSize = 11,
 		LayoutOrder = #TabOrder + 1,
 	}, TabBar)
-	round(tabBtn, UDim.new(0, 6))
+	round(tabBtn, UDim.new(1, 0))
+    make("UIStroke", {Color = THEME.Text, Thickness = 1, Transparency = 0.35, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, tabBtn)
 	make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, tabBtn)
 
 	local container = make("ScrollingFrame", {
@@ -1739,7 +1426,8 @@ local function CreateToggle(parent, text, configKey, callback)
 		BorderSizePixel = 0,
 		LayoutOrder = nextOrder(parent),
 	}, parent)
-	round(frame, UDim.new(0, 6))
+	round(frame, UDim.new(0, 8))
+    make("UIStroke", {Color = THEME.Text, Thickness = 1, Transparency = 0.25, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, frame)
 
 	make("TextLabel", {
 		Size = UDim2.new(1, -60, 1, 0),
@@ -1763,7 +1451,7 @@ local function CreateToggle(parent, text, configKey, callback)
 	local knob = make("Frame", {
 		Size = UDim2.fromOffset(16, 16),
 		Position = Config[configKey] and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundColor3 = Config[configKey] and THEME.Panel or THEME.Text,
 		BorderSizePixel = 0,
 	}, toggleBg)
 	round(knob, UDim.new(1, 0))
@@ -1779,10 +1467,12 @@ local function CreateToggle(parent, text, configKey, callback)
 	function handle.Set(on)
 		Config[configKey] = on and true or false
 		local state = Config[configKey]
+		if not suppressSwitchSave then savedSwitches[configKey] = state end
 		TweenService:Create(knob, TweenInfo.new(0.15), {
 			Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
 		}):Play()
 		toggleBg.BackgroundColor3 = state and THEME.Accent or THEME.Off
+        knob.BackgroundColor3 = state and THEME.Panel or THEME.Text
 		if callback then
 			local ok, err = pcall(callback, state)
 			if not ok then log(configKey .. " toggle error: " .. tostring(err)) end
@@ -1798,14 +1488,15 @@ end
 local function CreateButton(parent, text, callback)
 	local button = make("TextButton", {
 		Size = UDim2.new(1, 0, 0, 38),
-		BackgroundColor3 = Color3.fromRGB(40, 25, 80),
+		BackgroundColor3 = THEME.Row,
 		Text = text,
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
 		LayoutOrder = nextOrder(parent),
 	}, parent)
-	round(button, UDim.new(0, 6))
+	round(button, UDim.new(1, 0))
+    make("UIStroke", {Color = THEME.Text, Thickness = 1, Transparency = 0.25, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, button)
 	button.MouseButton1Click:Connect(function()
 		task.spawn(function()
 			local ok, err = pcall(callback)
@@ -1854,7 +1545,8 @@ local function CreateSlider(parent, text, configKey, suffix)
 		BorderSizePixel = 0,
 		LayoutOrder = nextOrder(parent),
 	}, parent)
-	round(frame, UDim.new(0, 6))
+	round(frame, UDim.new(0, 8))
+    make("UIStroke", {Color = THEME.Text, Thickness = 1, Transparency = 0.25, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, frame)
 
 	make("TextLabel", {
 		Position = UDim2.new(0, 10, 0, 4),
@@ -1947,11 +1639,68 @@ end
 -- ============================================================
 -- TABS AND FEATURES
 -- ============================================================
+local HomeTab = make("ScrollingFrame", {
+    Size = UDim2.new(1, -14, 1, -83), Position = UDim2.new(0, 7, 0, 80),
+    BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false,
+    CanvasSize = UDim2.fromOffset(0, 232), ScrollBarThickness = 3,
+    ScrollBarImageColor3 = THEME.Text,
+}, MainFrame)
+TabFrames.Home = {Container = HomeTab}
 local ThrowTab = CreateTab("Throw & Train")
 local ShopTab = CreateTab("Upgrades & Shop")
 local FarmTab = CreateTab("Farm")
 local ExtrasTab = CreateTab("Extras")
 local SettingsTab = CreateTab("Settings")
+-- Welcome, social buttons and two quick-navigation cards, like main.lua.
+make("TextLabel", {Size = UDim2.new(0.62, 0, 0, 34), Position = UDim2.fromOffset(6, 2), BackgroundTransparency = 1,
+    Text = "Welcome back to\nBRINELAND HUB", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 13,
+    TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left}, HomeTab)
+make("TextLabel", {Size = UDim2.new(0.62, 0, 0, 56), Position = UDim2.fromOffset(6, 38), BackgroundTransparency = 1,
+    Text = "Throw Food for Animals\nTraining, throw and farm tools.\nUse the tabs above to get started.", TextColor3 = THEME.TabText,
+    Font = Enum.Font.Gotham, TextSize = 10, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top}, HomeTab)
+local badge = make("Frame", {Size = UDim2.new(0.35, -6, 0, 88), Position = UDim2.new(0.65, 2, 0, 4), BackgroundColor3 = THEME.Row}, HomeTab)
+round(badge, UDim.new(0, 10))
+make("UIStroke", {Color = THEME.Text, Thickness = 1, Transparency = 0.25, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, badge)
+make("TextLabel", {Size = UDim2.new(1, -10, 0, 26), Position = UDim2.fromOffset(5, 8), BackgroundTransparency = 1,
+    Text = "BRINELAND", TextColor3 = THEME.Text, Font = Enum.Font.Fondamento, TextSize = 16}, badge)
+make("TextLabel", {Size = UDim2.new(1, -10, 0, 44), Position = UDim2.fromOffset(5, 36), BackgroundTransparency = 1,
+    Text = "THROW FOOD\nEDITION", TextColor3 = THEME.TabText, Font = Enum.Font.GothamBold, TextSize = 9, TextWrapped = true}, badge)
+local function homeButton(text, x, y, w, h, action)
+    local b = make("TextButton", {Size = UDim2.new(0.49, -2, 0, h), Position = UDim2.new(x, 0, 0, y),
+        BackgroundColor3 = THEME.Row, Text = text, TextColor3 = THEME.Text, Font = Enum.Font.GothamBold,
+        TextSize = 10, TextWrapped = true}, HomeTab)
+    round(b, UDim.new(0, 8))
+    make("UIStroke", {Color = THEME.Text, Thickness = 1, Transparency = 0.25, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, b)
+    b.MouseButton1Click:Connect(action)
+end
+local function copySocial(url)
+    local copy = setclipboard or toclipboard
+    if type(copy) == "function" then
+        local ok = pcall(copy, url)
+        notify("Brineland", ok and "Link copied." or "Could not copy link.", 3)
+    else notify("Brineland", "Clipboard not supported.", 3) end
+end
+homeButton("DISCORD", 0, 100, 0.49, 32, function() copySocial("https://discord.gg/epWMbuXSN5") end)
+homeButton("YOUTUBE", 0.51, 100, 0.49, 32, function() copySocial("https://youtube.com/@dcb_herobrine?si=PN8mSo36sJFaySFQ") end)
+-- Two feature cards with the same title/description layout as main.lua.
+local function homeCard(x, title, description, target)
+    local card = make("TextButton", {Size = UDim2.new(0.49, -2, 0, 84),
+        Position = UDim2.new(x, 0, 0, 140), BackgroundColor3 = THEME.Row,
+        Text = "", AutoButtonColor = false}, HomeTab)
+    round(card, UDim.new(0, 10))
+    make("UIStroke", {Color = THEME.Text, Thickness = 1, Transparency = 0.25,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, card)
+    make("TextLabel", {Size = UDim2.new(1, -16, 0, 22), Position = UDim2.fromOffset(10, 8),
+        BackgroundTransparency = 1, Text = title, TextColor3 = THEME.Text,
+        Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left}, card)
+    make("TextLabel", {Size = UDim2.new(1, -16, 0, 44), Position = UDim2.fromOffset(10, 32),
+        BackgroundTransparency = 1, Text = description, TextColor3 = THEME.TabText,
+        Font = Enum.Font.Gotham, TextSize = 10, TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top}, card)
+    card.MouseButton1Click:Connect(function() selectTab(target) end)
+end
+homeCard(0, "Throw & Train", "Auto Throw, Perfect, Fast and training", "Throw & Train")
+homeCard(0.51, "Auto Farm", "Training and throw cycles", "Farm")
 
 local function loopCallback(key, intervalFn, action, onStop)
 	return function(on)
@@ -1966,9 +1715,9 @@ end
 
 -- Throw & Train
 CreateSection(ThrowTab, "Throwing")
-CreateToggle(ThrowTab, "Auto Throw", "AutoThrow", function(on)
-	if on then refreshThrowing() end -- turning it off needs nothing: the watcher ends itself
-end)
+CreateToggle(ThrowTab, "Auto Throw", "AutoThrow", function() refreshThrowing() end)
+CreateToggle(ThrowTab, "Perfect Throw", "PerfectThrow", function() end)
+CreateToggle(ThrowTab, "Fast Throw", "FastThrow", function() end)
 local ThrowStatus = CreateLabel(ThrowTab, throwStatusText(), 104)
 CreateSection(ThrowTab, "Training & Plot")
 CreateToggle(ThrowTab, "Auto Train", "AutoTrain", function(on)
@@ -1977,16 +1726,16 @@ end)
 local TrainStatus = CreateLabel(ThrowTab, trainStatusText(), 78)
 CreateToggle(ThrowTab, "Auto Equip Best", "AutoEquipBest", loopCallback("AutoEquipBest",
 	function() return Config.EquipDelay end,
-	function() callRemote("Plot_EquipBest") end))
+	function() if not Config.AutoFarm then callRemote("Plot_EquipBest") end end))
 CreateToggle(ThrowTab, "Auto Sell All", "AutoSell", loopCallback("AutoSell",
 	function() return Config.SellDelay end,
-	function() callRemote("Plot_SellAll") end))
+	function() if not Config.AutoFarm then callRemote("Plot_SellAll") end end))
 
 -- Upgrades & Shop
 CreateSection(ShopTab, "Upgrades & Shop")
 CreateToggle(ShopTab, "Auto Upgrade Stand", "AutoUpgradeBar", loopCallback("AutoUpgradeBar",
 	function() return Config.UpgradeDelay end,
-	function() callRemote("Stand_Upgrade") end))
+	function() if not Config.AutoFarm then callRemote("Stand_Upgrade") end end))
 CreateToggle(ShopTab, "Auto Claim Free Animal", "AutoClaimFreeAnimal", loopCallback("AutoClaimFreeAnimal",
 	function() return Config.FreeDelay end,
 	function() callRemote("Shop_ClaimFree") end))
@@ -2003,12 +1752,12 @@ CreateButton(FarmTab, "Reset Farming Cycle Timers", function()
 	resetFarmCycle()
 	notify("Farming Timers Reset", "Cycle reset back to Phase 1 (10 min training).", 3)
 end)
-CreateLabel(FarmTab, "Phase 1 (10 min): go to your treadmill, keep training and upgrade. Phase 2 (5 min): go to the throw spot, auto throw at the perfect bar, equip best and sell all (equip and sell use their own delays from Settings). Turning it off pauses and keeps your place in the cycle.", 110)
+CreateLabel(FarmTab, "Phase 1 (10 min): train and upgrade. Phase 2 (5 min): walk to the throw area, throw, equip best and SELL ALL. Farm owns upgrade/equip/sell while running. Pausing keeps the cycle position for this session.", 110)
 
 -- Extras
 CreateSection(ExtrasTab, "Anti-AFK")
 CreateToggle(ExtrasTab, "Anti-AFK (always on by default)", "AntiAFK", nil)
-CreateLabel(ExtrasTab, "Stops Roblox from kicking you for standing still. Leave it on.", 44)
+CreateLabel(ExtrasTab, "Attempts to prevent idle disconnects; support depends on your executor.", 44)
 CreateSection(ExtrasTab, "2x speed button")
 CreateToggle(ExtrasTab, "Auto 2x Speed Button", "AutoBoost", loopCallback("AutoBoost",
 	function() return 1.5 end, pressBoost))
@@ -2016,9 +1765,47 @@ local BoostStatus = CreateLabel(ExtrasTab, boostStatusText(), 56)
 
 -- Settings
 CreateSection(SettingsTab, "Auto Throw")
-CreateSlider(SettingsTab, "Perfect Bar Value", "PerfectValue", nil)
-CreateSlider(SettingsTab, "Tap Method", "TapMethod", nil)
-CreateLabel(SettingsTab, "Auto Throw taps when the bar number reaches Perfect Bar Value. Tap Method: 1 = screen tap, 2 = press the game's tap button, 3 = virtual click. If it never taps or the tap does nothing, try the next number.", 96)
+CreateSlider(SettingsTab, "Fast Throw Speed", "FastSpeed", "x")
+CreateButton(SettingsTab, "Retry Throw Modules", function()
+    Throw.nextLoad = 0
+    loadThrowModules()
+    notify("Auto Throw", "Retrying module loading. Check Throw & Train status.", 4)
+end)
+CreateButton(SettingsTab, "Copy Diagnostics", function()
+    local lines = {"PlaceId: " .. tostring(game.PlaceId), "Auto Throw: " .. Throw.note}
+    for _, name in ipairs({"ClientState", "ThrowMeter", "ThrowMeterMath", "GameConfig", "ProjectileMath", "AnimationLibrary", "meterWrite", "HalfPeriod", "arcWrite", "animWrite", "loader"}) do
+        if Throw.errors[name] then table.insert(lines, name .. ": " .. tostring(Throw.errors[name])) end
+    end
+    for _, name in ipairs(EXPECTED_REMOTES) do
+        local remote = getRemote(name)
+        table.insert(lines, name .. ": " .. (remote and "found" or "missing"))
+    end
+    local copy = setclipboard or toclipboard
+    local ok = type(copy) == "function" and pcall(copy, table.concat(lines, "\n"))
+    notify("Diagnostics", ok and "Copied diagnostics." or "Clipboard not supported.", 4)
+end)
+CreateLabel(SettingsTab, "Uses the game's ThrowMeter and math modules; Perfect and Fast are applied only while Auto Throw or farm phase 2 is active. Module support and successful throws depend on the game.", 92)
+CreateSection(SettingsTab, "Saved Switches")
+CreateLabel(SettingsTab, "Switch states are saved. They do not start automatically. Loading can start farming, upgrades and SELL ALL.", 62)
+CreateButton(SettingsTab, "Save Current Switches", function()
+	for key in pairs(Toggles) do savedSwitches[key] = Config[key] == true end
+	if saveSettings() then
+		notify("Config", "Current switches saved.", 4)
+	else
+		notify("Config", "Could not save switches. Check executor file support.", 5)
+	end
+end)
+CreateButton(SettingsTab, "Load Saved Switches", function()
+	if not next(savedSwitches) then notify("Config", "No saved switches yet.", 4); return end
+	-- Avoid overwriting the remaining snapshot while toggles are being applied.
+	suppressSwitchSave = true
+	for _, key in ipairs({ "PerfectThrow", "FastThrow", "AntiAFK", "AutoFarm", "AutoTrain", "AutoThrow", "AutoEquipBest", "AutoSell", "AutoUpgradeBar", "AutoClaimFreeAnimal", "AutoBoost" }) do
+		local value = savedSwitches[key]
+		if type(value) == "boolean" and Toggles[key] then Toggles[key].Set(value) end
+	end
+	suppressSwitchSave = false
+	notify("Config", "Saved switches loaded.", 4)
+end)
 CreateSection(SettingsTab, "Delays")
 CreateSlider(SettingsTab, "Train Delay", "TrainDelay", "s")
 CreateSlider(SettingsTab, "Upgrade Delay", "UpgradeDelay", "s")
@@ -2028,7 +1815,8 @@ CreateSlider(SettingsTab, "Sell Delay", "SellDelay", "s")
 CreateSlider(SettingsTab, "Farm Upgrade Delay", "FarmUpgradeDelay", "s")
 CreateLabel(SettingsTab, "Brineland Hub - Throw Food For Animals. Settings are validated and saved to Brineland/ThrowFood.json.", 62)
 
-selectTab("Throw & Train")
+selectTab("Home")
+print("[Brineland] Home screen ready.")
 
 -- Keep the status labels fresh
 task.spawn(function()
@@ -2038,8 +1826,6 @@ task.spawn(function()
 		ThrowStatus.Text = throwStatusText()
 		TrainStatus.Text = trainStatusText()
 		BoostStatus.Text = boostStatusText()
-		local barLabel = ThrowUI.label
-		observeThrowSpot(barLabel ~= nil and barLabel:IsDescendantOf(PlayerGui) and isShown(barLabel))
 	end
 end)
 
@@ -2049,13 +1835,13 @@ end)
 local function cleanup()
 	if not alive then return end
 	saveSettings()
+	suppressSwitchSave = true -- unloading must not erase the saved on/off states
 	-- switch every feature off first (the training heartbeat then sends the final Training_Stop)
 	for _, key in ipairs(FEATURE_KEYS) do
 		if Config[key] and Toggles[key] then pcall(Toggles[key].Set, false) end
 	end
 	alive = false
-	releaseCamera() -- hand the camera back to the game if the cutscene lock is on
-	restoreHiddenGuis() -- and switch back on anything that was hidden for the current throw
+	restoreThrowMods() -- restore only module fields still owned by this hub
 	for _, connection in ipairs(connections) do pcall(function() connection:Disconnect() end) end
 	pcall(function() ScreenGui:Destroy() end)
 	if env.BrinelandThrowFoodUnload == cleanup then env.BrinelandThrowFoodUnload = nil end
@@ -2063,7 +1849,16 @@ end
 env.BrinelandThrowFoodUnload = cleanup
 
 CloseBtn.MouseButton1Click:Connect(cleanup)
-PillCloseBtn.MouseButton1Click:Connect(cleanup)
 
-notify("Brineland Hub", "Throw Food For Animals loaded. Tap FOOD to hide / show.", 4)
-print("[BRINELAND] Throw Food For Animals Master Edition v7 loaded!")
+notify("Brineland Hub", "Throw Food loaded. Use the arrow to collapse or expand.", 4)
+print("[BRINELAND] Throw Food For Animals Master Edition (module throw update) loaded!")
+
+end, function(err)
+    if debug and type(debug.traceback) == "function" then
+        return debug.traceback(tostring(err), 2)
+    end
+    return tostring(err)
+end)
+if not startupOK then
+    warn("[Brineland] Startup failed: " .. tostring(startupError))
+end
